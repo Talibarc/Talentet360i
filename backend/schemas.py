@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
  
  
 class RoleCreate(BaseModel):
@@ -34,6 +35,12 @@ class RoleSkillMapCreate(BaseModel):
     target_level: int | None = Field(default=None, ge=0, le=5)
     target_label: str | None = None
     is_expected: bool = True
+
+    @model_validator(mode="after")
+    def blank_is_not_expected(self):
+        if self.target_level is None:
+            self.is_expected = False
+        return self
  
  
 class RoleSkillMapResponse(RoleSkillMapCreate):
@@ -46,10 +53,21 @@ class QuestionGenerateRequest(BaseModel):
  
  
 class GeneratedQuestion(BaseModel):
-    question_text: str
+    question_text: str = Field(min_length=1)
     options: dict[str, str]
     correct_answer: str = Field(pattern="^[A-D]$")
-    explanation: str
+    explanation: str = Field(min_length=1)
+    rag_source: str | None = None
+
+    @model_validator(mode="after")
+    def validate_options(self):
+        if set(self.options) != set("ABCD") or any(
+            not option.strip() for option in self.options.values()
+        ):
+            raise ValueError("Questions require four nonempty options A, B, C, D")
+        if len(set(self.options.values())) != 4:
+            raise ValueError("Question options must be distinct")
+        return self
  
  
 class QuestionResponse(GeneratedQuestion):
@@ -101,6 +119,66 @@ class AssessmentAnswerSubmit(BaseModel):
  
 class AssessmentSubmitRequest(BaseModel):
     answers: list[AssessmentAnswerSubmit] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def unique_answers(self):
+        if len({answer.question_id for answer in self.answers}) != len(self.answers):
+            raise ValueError("Submit exactly one answer per question")
+        return self
+
+
+class LearningResource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    resource_id: str
+    title: str
+    url: str | None = None
+    source_file: str
+    source_sheet: str
+    source_row: int
+    mapping_sheet: str
+    mapping_row: int
+    source_skill_id: str
+    level_scope: str | None = None
+    review_status: str | None = None
+
+
+class TniNarrative(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    summary: str = Field(min_length=1)
+    development_focus: str = Field(min_length=1)
+    next_steps: list[str] = Field(min_length=1)
+    recommended_resource_ids: list[str]
+    limitations: list[str]
+
+
+class TniSkillGap(BaseModel):
+    assessment_id: int
+    role_skill_map_id: int
+    skill_id: int
+    skill_name: str
+    score_percentage: int
+    current_level: int
+    target_level: int
+    skill_gap: int
+    gap_status: str
+    expert_confirmation_required: bool
+    recommendation: str
+    detail: TniNarrative
+    learning_resources: list[LearningResource]
+    learning_status: str
+    proficiency_status: Literal["provisional"] = "provisional"
+
+
+class EmployeeTniResponse(BaseModel):
+    employee_id: int
+    employee_code: str
+    employee_name: str
+    xp_points: int
+    skills_assessed: int
+    target_met: int
+    development_needed: int
+    provider: Literal["mock", "luna"]
+    skill_gaps: list[TniSkillGap]
  
  
 class AssessmentResult(BaseModel):

@@ -6,6 +6,8 @@ from assessment_service import (
 )
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from llm_provider import ProviderError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from question_service import generate_question_drafts
@@ -23,6 +25,11 @@ app = FastAPI(
     title="Talent360i API",
     version="1.1.0",
 )
+
+
+@app.exception_handler(ProviderError)
+async def provider_error_handler(request, error):
+    return JSONResponse(status_code=503, content={"detail": str(error)})
  
 app.add_middleware(
     CORSMiddleware,
@@ -240,7 +247,7 @@ def generate_questions(
             options=draft.options,
             correct_answer=draft.correct_answer,
             explanation=draft.explanation,
-            rag_source="Finance Excel RAG",
+            rag_source=draft.rag_source,
             status="pending_review",
         )
         db.add(question)
@@ -373,6 +380,7 @@ def complete_assessment(
 
 @app.get(
     "/users/{employee_id}/tni",
+    response_model=schemas.EmployeeTniResponse,
     tags=["Skill Profile & TNI"],
 )
 def read_employee_tni(
@@ -385,4 +393,4 @@ def read_employee_tni(
 if __name__ == "__main__":
     import uvicorn
  
-    uvicorn.run(app, host="127.0.0.1", port=8000) 
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -1,0 +1,10 @@
+# Direct runtime dependencies. requirements.txt locks the installed closure.
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+python-dotenv
+openpyxl
+azure-ai-inference
+azure-core
+

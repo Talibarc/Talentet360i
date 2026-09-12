@@ -3,6 +3,15 @@ from sqlalchemy.orm import Session
  
 import models
 import schemas
+
+
+def calculate_achieved_level(score_percentage: int, target_level: int) -> int:
+    """Existing prototype bands, not yet certified against company scoring policy."""
+    if score_percentage >= 95:
+        return target_level
+    if score_percentage > 80:
+        return min(target_level, max(1, target_level - 1))
+    return max(0, target_level - 2)
  
  
 def create_assessment(
@@ -23,11 +32,15 @@ def create_assessment(
             detail="Role-skill mapping not found",
         )
  
+    if not mapping.is_expected or mapping.target_level is None:
+        raise HTTPException(status_code=400, detail="Skill is Not Expected for this mapping")
+
     questions = (
         db.query(models.Question)
         .filter(
             models.Question.skill_id == mapping.skill_id,
             models.Question.status == "approved",
+            models.Question.skill_level == mapping.target_level,
         )
         .order_by(models.Question.id.desc())
         .limit(payload.question_count)
@@ -116,6 +129,10 @@ def submit_assessment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Assessment has already been submitted",
         )
+
+    mapping = db.get(models.RoleSkillMap, assessment.role_skill_map_id)
+    if mapping is None or not mapping.is_expected or mapping.target_level is None:
+        raise HTTPException(status_code=400, detail="Skill is Not Expected for this mapping")
  
     answer_rows = (
         db.query(models.AssessmentItem)
@@ -154,19 +171,9 @@ def submit_assessment(
     )
     xp_awarded = correct_answers * 10
  
-    mapping = db.get(models.RoleSkillMap, assessment.role_skill_map_id)
-    target_level = (
-        mapping.target_level
-        if mapping.target_level is not None
-        else 1
-    )
+    target_level = mapping.target_level
  
-    if score_percentage >= 95:
-        achieved_level = target_level
-    elif score_percentage > 80:
-        achieved_level = max(1, target_level - 1)
-    else:
-        achieved_level = max(0, target_level - 2)
+    achieved_level = calculate_achieved_level(score_percentage, target_level)
  
     assessment.correct_answers = correct_answers
     assessment.score_percentage = score_percentage
@@ -188,4 +195,4 @@ def submit_assessment(
         "achieved_level": assessment.achieved_level,
         "xp_awarded": assessment.xp_awarded,
     }
- 
+

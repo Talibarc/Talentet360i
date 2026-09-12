@@ -2,15 +2,17 @@ from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import StaticPool
+from config import DATABASE_URL
 
 BACKEND_DIR = Path(__file__).resolve().parent
 DATABASE_FILE = BACKEND_DIR / "talent360i.db"
-DATABASE_URL = f"sqlite:///{DATABASE_FILE.as_posix()}"
  
  
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
+    **({"poolclass": StaticPool} if DATABASE_URL == "sqlite:///:memory:" else {}),
 )
  
  

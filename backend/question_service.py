@@ -1,8 +1,5 @@
-import json
-from typing import Any
-
 import schemas
-from llm_service import generate_text
+from llm_provider import get_provider, ProviderError
 from rag_service import build_finance_rag_context
 
 SYSTEM_PROMPT = """
@@ -15,21 +12,6 @@ Only one option can be correct.
 """
  
  
-def _extract_json_array(raw_text: str) -> list[dict[str, Any]]:
-    start = raw_text.find("[")
-    end = raw_text.rfind("]")
- 
-    if start == -1 or end == -1:
-        raise ValueError("Luna did not return a valid JSON array")
- 
-    data = json.loads(raw_text[start : end + 1])
- 
-    if not isinstance(data, list):
-        raise TypeError("Luna response must be a JSON array")
- 
-    return data
- 
- 
 def generate_question_drafts(
     role_name: str,
     skill_name: str,
@@ -38,10 +20,14 @@ def generate_question_drafts(
     source_context: str,
     question_count: int,
 ) -> list[schemas.GeneratedQuestion]:
-    rag_context = build_finance_rag_context(
-    role_name,
-    skill_name,
-)
+    provider = get_provider()
+    if provider.name == "mock":
+        rag_context = "Synthetic practice only; no company source retrieval."
+    else:
+        try:
+            rag_context = build_finance_rag_context(role_name, skill_name)
+        except (ValueError, FileNotFoundError, KeyError):
+            raise ProviderError("Required Finance source context is unavailable") from None
     user_prompt = f"""
 Role: {role_name}
 Skill: {skill_name}
@@ -75,13 +61,7 @@ Return this JSON structure:
 ]
 """
  
-    raw_response = generate_text(SYSTEM_PROMPT, user_prompt)
-    items = _extract_json_array(raw_response)
-
-    for item in items:
-     item["rag_source"] = "Finance Excel RAG"
- 
-    return [
-        schemas.GeneratedQuestion.model_validate(item)
-        for item in items
-    ]
+    return provider.questions(
+        system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt,
+        skill_name=skill_name, target_level=target_level, question_count=question_count,
+    )
