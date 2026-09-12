@@ -43,16 +43,35 @@ def get_employee_tni(db: Session, employee_id: int):
             raise ProviderError("Provider recommended a resource absent from supplied mappings")
         # Resource titles, URLs and citations come from workbook rows, never the LLM.
         recommended = [allowed[key] for key in selected]
+        official = db.query(models.OfficialLevel).filter_by(employee_id=employee_id,
+                                                           role_skill_map_id=mapping.id).first()
+        review = db.get(models.ResultReview, assessment.id)
         gaps.append(TniSkillGap(
             assessment_id=assessment.id, role_skill_map_id=mapping.id, skill_id=skill.id,
             **facts, gap_status="Target met" if gap == 0 else "Development needed",
             expert_confirmation_required=current >= 3, recommendation=detail.development_focus,
             detail=detail, learning_resources=recommended, learning_status=learning_status,
+            official_confirmed_level=official.confirmed_level if official else None,
+            official_assessment_id=official.assessment_id if official else None,
+            proficiency_status="confirmed" if official and official.assessment_id == assessment.id else "provisional",
+            review_status=review.status if review else "pending_review",
         ))
+    unassessed = []
+    profile = db.get(models.UserProfile, employee_id)
+    if profile and profile.job_role_id:
+        for mapping in db.query(models.RoleSkillMap).filter_by(role_id=profile.job_role_id, is_expected=True):
+            if mapping.target_level is not None and mapping.id not in seen:
+                skill = db.get(models.Skill, mapping.skill_id)
+                resources, learning_status = get_learning_resources(skill.name, profile.business_function or "")
+                unassessed.append({"role_skill_map_id": mapping.id, "skill_id": skill.id, "skill_name": skill.name,
+                    "current_level": None, "target_level": mapping.target_level, "skill_gap": None,
+                    "status": "not_assessed", "learning_resources": [r.model_dump() for r in resources],
+                    "learning_status": learning_status})
     target_met = sum(item.skill_gap == 0 for item in gaps)
     return EmployeeTniResponse(
         employee_id=employee.id, employee_code=employee.employee_id,
         employee_name=employee.full_name, xp_points=employee.xp_points,
         skills_assessed=len(gaps), target_met=target_met,
         development_needed=len(gaps) - target_met, provider=provider.name, skill_gaps=gaps,
+        unassessed_skills=unassessed,
     )

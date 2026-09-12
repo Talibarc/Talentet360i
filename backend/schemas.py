@@ -50,6 +50,7 @@ class RoleSkillMapResponse(RoleSkillMapCreate):
 class QuestionGenerateRequest(BaseModel):
     role_skill_map_id: int = Field(gt=0)
     question_count: int = Field(default=3, ge=1, le=5)
+    require_approved_sop: bool = False
  
  
 class GeneratedQuestion(BaseModel):
@@ -166,7 +167,10 @@ class TniSkillGap(BaseModel):
     detail: TniNarrative
     learning_resources: list[LearningResource]
     learning_status: str
-    proficiency_status: Literal["provisional"] = "provisional"
+    proficiency_status: Literal["provisional", "confirmed"] = "provisional"
+    official_confirmed_level: int | None = None
+    official_assessment_id: int | None = None
+    review_status: str = "pending_review"
 
 
 class EmployeeTniResponse(BaseModel):
@@ -179,6 +183,7 @@ class EmployeeTniResponse(BaseModel):
     development_needed: int
     provider: Literal["mock", "luna"]
     skill_gaps: list[TniSkillGap]
+    unassessed_skills: list[dict] = Field(default_factory=list)
  
  
 class AssessmentResult(BaseModel):
@@ -196,9 +201,14 @@ class UserCreate(BaseModel):
     email: str = Field(min_length=3, max_length=150)
     role: str = Field(
         default="employee",
-        pattern="^(employee|reviewer|manager|leader)$",
+        pattern="^(admin|ld|employee|reviewer|manager|leader)$",
     )
     department: str | None = None
+    job_role_id: int | None = Field(default=None, gt=0)
+    manager_id: int | None = Field(default=None, gt=0)
+    business_function: str | None = Field(default=None, max_length=100)
+    team: str | None = Field(default=None, max_length=100)
+    hub: str | None = Field(default=None, max_length=100)
  
  
 class UserResponse(UserCreate):

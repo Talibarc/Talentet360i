@@ -10,6 +10,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
+    event,
+    DDL,
 )
 
 
@@ -124,3 +127,169 @@ class AssessmentItem(Base):
     selected_answer = Column(String(10), nullable=True)
     is_correct = Column(Boolean, nullable=True)
     answered_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+    user_id = Column(ForeignKey("users.id"), primary_key=True)
+    job_role_id = Column(ForeignKey("roles.id"), nullable=True)
+    manager_id = Column(ForeignKey("users.id"), nullable=True)
+    business_function = Column(String(100), nullable=True)
+    team = Column(String(100), nullable=True)
+    hub = Column(String(100), nullable=True)
+
+
+class QuestionScope(Base):
+    __tablename__ = "question_scopes"
+    question_id = Column(ForeignKey("questions.id"), primary_key=True)
+    role_skill_map_id = Column(ForeignKey("role_skill_maps.id"), nullable=False)
+
+
+class QuestionRevision(Base):
+    __tablename__ = "question_revisions"
+    id = Column(Integer, primary_key=True)
+    question_id = Column(ForeignKey("questions.id"), nullable=False)
+    revision = Column(Integer, nullable=False)
+    action = Column(String(30), nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    actor_id = Column(ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (UniqueConstraint("question_id", "revision"),)
+
+
+class ScoringPolicy(Base):
+    __tablename__ = "scoring_policies"
+    id = Column(Integer, primary_key=True)
+    role_skill_map_id = Column(ForeignKey("role_skill_maps.id"), nullable=False)
+    settings = Column(JSON, nullable=False)
+    source_reference = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class AssessmentSnapshot(Base):
+    __tablename__ = "assessment_snapshots"
+    assessment_id = Column(ForeignKey("assessments.id"), primary_key=True)
+    target_level = Column(Integer, nullable=False)
+    policy = Column(JSON, nullable=False)
+    critical_failed = Column(Boolean, default=False, nullable=False)
+
+
+class ItemSnapshot(Base):
+    __tablename__ = "item_snapshots"
+    item_id = Column(ForeignKey("assessment_items.id"), primary_key=True)
+    revision_id = Column(ForeignKey("question_revisions.id"), nullable=True)
+    content = Column(JSON, nullable=False)
+
+
+class ResultReview(Base):
+    __tablename__ = "result_reviews"
+    assessment_id = Column(ForeignKey("assessments.id"), primary_key=True)
+    status = Column(String(30), default="pending_review", nullable=False)
+    revision = Column(Integer, default=1, nullable=False)
+
+
+class Evidence(Base):
+    __tablename__ = "evidence"
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(ForeignKey("users.id"), nullable=False)
+    role_skill_map_id = Column(ForeignKey("role_skill_maps.id"), nullable=False)
+    assessment_id = Column(ForeignKey("assessments.id"), nullable=True)
+    status = Column(String(30), default="submitted", nullable=False)
+    revision = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class EvidenceRevision(Base):
+    __tablename__ = "evidence_revisions"
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(ForeignKey("evidence.id"), nullable=False)
+    revision = Column(Integer, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    url = Column(Text, nullable=True)
+    actor_id = Column(ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (UniqueConstraint("evidence_id", "revision"),)
+
+
+class ManagerDecision(Base):
+    __tablename__ = "manager_decisions"
+    id = Column(Integer, primary_key=True)
+    manager_id = Column(ForeignKey("users.id"), nullable=False)
+    employee_id = Column(ForeignKey("users.id"), nullable=False)
+    assessment_id = Column(ForeignKey("assessments.id"), nullable=True)
+    evidence_id = Column(ForeignKey("evidence.id"), nullable=True)
+    decision = Column(String(20), nullable=False)
+    comment = Column(Text, nullable=False)
+    reviewed_revision = Column(Integer, nullable=False)
+    confirmed_level = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class OfficialLevel(Base):
+    __tablename__ = "official_levels"
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(ForeignKey("users.id"), nullable=False)
+    role_skill_map_id = Column(ForeignKey("role_skill_maps.id"), nullable=False)
+    assessment_id = Column(ForeignKey("assessments.id"), nullable=False)
+    decision_id = Column(ForeignKey("manager_decisions.id"), nullable=False)
+    confirmed_level = Column(Integer, nullable=False)
+    confirmed_at = Column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (UniqueConstraint("employee_id", "role_skill_map_id"),)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True)
+    recipient_id = Column(ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    event_type = Column(String(60), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    id = Column(Integer, primary_key=True)
+    actor_id = Column(ForeignKey("users.id"), nullable=True)
+    subject_id = Column(ForeignKey("users.id"), nullable=True)
+    action = Column(String(80), nullable=False)
+    entity_type = Column(String(60), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    details = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
+class Quest(Base):
+    __tablename__ = "quests"
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    event_type = Column(String(40), nullable=False)
+    required_count = Column(Integer, nullable=False)
+    xp_reward = Column(Integer, nullable=False)
+    business_function = Column(String(100), nullable=True)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class XpAward(Base):
+    __tablename__ = "xp_awards"
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(ForeignKey("users.id"), nullable=False)
+    source_key = Column(String(100), nullable=False)
+    points = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (UniqueConstraint("employee_id", "source_key"),)
+
+
+# Enforced by SQLite as well as by the absence of update/delete APIs.
+for immutable in (AuditEvent, QuestionRevision, EvidenceRevision, ManagerDecision, XpAward, ScoringPolicy):
+    for operation in ("UPDATE", "DELETE"):
+        event.listen(immutable.__table__, "after_create", DDL(
+            f"CREATE TRIGGER IF NOT EXISTS {immutable.__tablename__}_no_{operation.lower()} "
+            f"BEFORE {operation} ON {immutable.__tablename__} BEGIN "
+            "SELECT RAISE(ABORT, 'append-only history'); END"
+        ).execute_if(dialect="sqlite"))

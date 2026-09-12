@@ -1,6 +1,6 @@
 # Talent360i project context and repository audit
 
-Audit date: 2026-09-12. Baseline commit: `a953cd2`. The findings below describe the initial repository before implementation. The user subsequently authorized Phase 1 only; see NEXT_STEPS.md for current verified results and README.md for local setup. The historical status matrix below is not a description of the updated Phase 1 code.
+Audit date: 2026-09-12. Baseline commit: `a953cd2`. The findings below describe the initial repository before implementation. The user subsequently authorized Phase 1 and Phase 2 backend work. See NEXT_STEPS.md for current verified results, README.md for setup, and backend/README.md for the protected demo API. The historical status matrix below is not a description of the updated code.
 
 ## Stable requirements
 

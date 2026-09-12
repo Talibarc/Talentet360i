@@ -1,23 +1,6 @@
-import re
 from typing import Any
  
 from excel_loader import FINANCE_FILE, read_sheet
- 
- 
-STOP_WORDS = {
-    "and",
-    "or",
-    "the",
-    "for",
-    "of",
-    "with",
-    "to",
-}
- 
- 
-def _tokens(value: str) -> set[str]:
-    words = re.findall(r"[a-z0-9]+", value.lower())
-    return {word for word in words if word not in STOP_WORDS}
  
  
 def retrieve_finance_context(
@@ -63,24 +46,11 @@ def retrieve_finance_context(
         if row.get("role_id") == role_id
     ]
  
-    requested_tokens = _tokens(skill_name)
-    scored_mappings = []
- 
-    for mapping in role_mappings:
-        mapped_tokens = _tokens(str(mapping.get("skill", "")))
-        score = len(requested_tokens & mapped_tokens)
-        scored_mappings.append((score, mapping))
- 
-    scored_mappings.sort(
-        key=lambda item: item[0],
-        reverse=True,
-    )
- 
-    matched_mappings = [
-        mapping
-        for score, mapping in scored_mappings
-        if score > 0
-    ][:2]
+    # Never substitute a similarly named skill for a missing source mapping.
+    matched_mappings = [mapping for mapping in role_mappings
+                        if str(mapping.get("skill", "")).strip().casefold() == skill_name.strip().casefold()]
+    if not matched_mappings:
+        raise ValueError("Requested source skill mapping is unavailable")
  
     skill_lookup = {
         row.get("skill_id"): row
@@ -92,7 +62,13 @@ def retrieve_finance_context(
     for mapping in matched_mappings:
         skill = skill_lookup.get(mapping.get("skill_id"), {})
         level = mapping.get("target_proficiency_level")
+        if not skill or level is None:
+            raise ValueError("Source skill reference or target level is missing")
+        if isinstance(level, (float, int)) and int(level) == level:
+            level = int(level)
         indicator_column = f"L{level}_indicator"
+        if not skill.get(indicator_column):
+            raise ValueError("Source proficiency indicator is missing")
  
         matched_skills.append(
             {

@@ -5,6 +5,9 @@ import socket
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 os.environ["LLM_PROVIDER"] = "mock"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+for name in tuple(os.environ):
+    if name.startswith(("LUNA_", "CIS_")):
+        os.environ.pop(name)
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +17,8 @@ import config
 import learning_service
 from database import Base, engine
 from main import app
+from auth import current_user
+import models
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +44,17 @@ def isolated_environment(monkeypatch, tmp_path):
 
 @pytest.fixture
 def client():
+    # Retain the Phase 1 workflow assertions under an explicitly privileged test identity.
+    # Production never has this dependency override. Phase 2 uses real headers instead.
+    app.dependency_overrides[current_user] = lambda: models.User(role="admin", id=None)
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def secure_client():
+    app.dependency_overrides.clear()
     with TestClient(app) as client:
         yield client
 

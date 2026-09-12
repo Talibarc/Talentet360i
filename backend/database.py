@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import StaticPool
 from config import DATABASE_URL
@@ -14,6 +14,14 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     **({"poolclass": StaticPool} if DATABASE_URL == "sqlite:///:memory:" else {}),
 )
+
+
+@event.listens_for(engine, "connect")
+def sqlite_integrity(connection, record):
+    cursor = connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA busy_timeout=10000")
+    cursor.close()
  
  
 SessionLocal = sessionmaker(
@@ -32,5 +40,9 @@ def get_db():
  
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

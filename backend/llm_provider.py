@@ -77,7 +77,7 @@ class MockProvider:
             ),
             recommended_resource_ids=[r["resource_id"] for r in resources],
             limitations=["Mock narrative; achieved levels use the existing provisional scoring rule.",
-                         "Manager confirmation is not implemented in Phase 1.",
+                         "Calculated proficiency is separate from manager-confirmed official proficiency.",
                          "Resource mappings do not establish document approval or level suitability."],
         )
 
