@@ -1,6 +1,6 @@
 from typing import Annotated
 from zipfile import BadZipFile
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import update, or_
@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 import models
+import config
 import schemas
 import workflow_schemas as ws
 import workflow_service as workflows
@@ -71,6 +72,23 @@ PROFILE_FIELDS = ("job_role_id", "manager_id", "business_function", "team", "hub
 @app.get("/me")
 def me(db: DbSession, actor: Actor):
     return user_response(db, actor)
+
+
+@app.get("/demo/identities")
+def demo_identities(request: Request, db: DbSession):
+    """Discover explicitly seeded synthetic identities for the local mock UI."""
+    if config.LLM_PROVIDER != "mock":
+        raise HTTPException(403, "Demo selector requires mock mode")
+    if not request.client or request.client.host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
+        raise HTTPException(403, "Demo selector is available on loopback only")
+    seeded = db.query(models.User).join(models.AuditEvent,
+        models.AuditEvent.subject_id == models.User.id).filter(
+        models.AuditEvent.action == "demo.identity_created",
+        models.User.employee_id.like("DEMO-%"),
+        models.User.email.like("%@example.invalid")).distinct().all()
+    return {"provider": "mock", "identities": [{"id": u.id, "role": u.role,
+        "label": u.employee_id, "business_function": profile(db, u.id).business_function
+        if profile(db, u.id) else None} for u in seeded]}
 
 
 @app.post("/users", response_model=schemas.UserResponse, status_code=201)

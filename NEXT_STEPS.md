@@ -1,3 +1,113 @@
+# Talent360i Phase 3 verification and next steps
+
+Phase 3 completed on 2026-09-12 against baseline `d6d5b5b`. The responsive frontend connects the existing mock backend. No commit or push was made. The Phase 1/2 reports below are retained as historical records.
+
+## Exact verification results
+
+| Check | Result |
+| --- | --- |
+| Complete backend suite | **PASS: 88 passed, 0 failed, 0 errors, 2 warnings in 38.61 s**. All 85 existing cases preserved; 3 new identity-discovery tests. |
+| Frontend tests | **PASS: 22 passed, 0 failed, 3 test files in 9.61 s**. Vitest / Testing Library synthetic fixtures. |
+| Frontend lint | **PASS: exit 0**, no lint findings. |
+| Production build | **PASS: exit 0**, TypeScript + Vite; final build 1.44 s. Main JS 240.93 kB and lazy leader/chart JS 361.04 kB; no oversized-chunk warning. |
+| Python dependency consistency | **PASS: no broken requirements found**. |
+| `git diff --check` | **PASS: exit 0**, no whitespace findings after generated-cache index cleanup. Git's LF/CRLF notices are informational. |
+| `git diff --cached --check` | **PASS: exit 0**. Only four generated workbook deletions are staged. |
+| Luna preservation | **PASS:** transport, config and provider source unchanged against HEAD after Git newline normalization. No live Luna calls or key requests. |
+| Supplied workbooks | **PASS:** both supplied source workbooks byte-for-byte unchanged. |
+| Secret/artifact scan | **PASS for current index/new text scope:** no credential heuristic matches; no tracked environment, database, dependency, cache or build paths after removing the four old generated test workbooks. No new unignored generated artifacts. This is not a historical secret audit or workbook confidentiality certification. |
+
+## Browser verification
+
+Real browser interactions used only the isolated ignored `backend/phase3-demo.sqlite` database, seeded with synthetic identities. No company users or workbook records were imported.
+
+- Finance: generate a question, SME approve, manager assign, employee submit (100%, calculated level 3), inspect TNI, submit linked evidence, manager confirm evidence and result, leader shows one confirmed level-3 record.
+- DataOps: generate/approve/assign, employee submit (0%, calculated level 1), claim a published quest (20 engagement XP), submit evidence, manager send back with comments, employee revise/resubmit, manager confirm evidence/result, leader shows one confirmed level-1 record and a two-level gap. XP did not alter proficiency.
+- Notifications: mark a displayed employee notice read; read status and unread indicator update. Audit history shows persisted scoped events and source-limit messages.
+- Desktop visual inspection: identity selection, Admin/L&D, reviewer content/rationale/source/history, employee dashboard and focused assessment, TNI, evidence, SkillQuest, manager inbox, leader chart/heatmap/details, notifications and audit.
+- Mobile visual inspection at a 390 x 844 viewport override: Admin, reviewer, employee, evidence, SkillQuest, manager, leader and audit. Document width matched scroll width in measured major pages (375 CSS px after scrollbar); wide tables scroll inside their cards. Override reset afterward.
+- Resumed final browser session reported **0 console errors**. Earlier development-only HMR reload errors after dependency/source updates cleared after a clean reload; workflows were then completed successfully.
+
+Initial implementation checks caught shared-export lint issues, Windows text encoding, and accessible control-name mismatches. These were corrected. Chart code was split into a lazy bundle. The two backend warnings remain upstream Starlette/httpx and AnyIO deprecations, unchanged from prior phases.
+
+## MVP status matrix
+
+| Experience | Synthetic demo status | Boundary |
+| --- | --- | --- |
+| Admin/L&D | Complete | Source-health warnings, workbook validation, existing mappings, exact Finance context lookup, draft generation, assignment and quest publication. No invented source imports. |
+| SME/Reviewer | Complete | Pending/status queues, separate content/answer/source sections, edit/reapproval, approve/reject comments and frozen revision history. |
+| Employee assessment | Complete | Own assignments, focused question dialog, progress, answer submission, deterministic score and provisional level. No correct answers or explanations rendered before submission. |
+| TNI / learning | Complete for available mappings | Separate calculated/official levels, targets, unassessed skills, development steps and source-constrained links. Missing mappings remain explicitly unavailable. |
+| Evidence | Complete text/link workflow | Submission, history, send-back comments and resubmission. Binary file uploads are not implemented or claimed. |
+| Manager | Complete | Scoped inbox, selected result context, latest TNI/official comparison, evidence decisions, result confirmation/send-back, history and assignment. |
+| Leader | Complete | Confirmed-only KPIs, distribution chart, gap heatmap, details and function/role/team/hub/skill/level filters. No public individual leaderboard. |
+| Notifications / governance | Complete | Own notifications/unread/read, scoped audit history with filtering/paging and explicit source limitations. |
+| SkillQuest / XP | Complete basic experience | Published quests, progress, claim state and XP ledger; engagement never changes official proficiency. |
+| Responsive / accessibility | Verified | Shared cards/forms/chips/tabs/dialogs, persistent desktop navigation, mobile drawer, keyboard focus, labelled controls, skeleton/empty/error/success states, constrained tables. |
+| Provider boundary | Preserved | Mock used in the running demo; original Luna source remains unchanged and uncalled live. |
+
+## Remaining blockers and limits
+
+1. **13 missing Finance references** remain unresolved. Neither supplied workbook is modified. Workbook masking/classification remains unverified.
+2. **Approved SOP/training documents are absent/unregistered.** Real internal-skill RAG and DataOps document retrieval require authorized sources. Mock exercises do not claim SOP provenance.
+3. **Company scoring, critical-fail policy, level frameworks and learning suitability/approval require authoritative validation.** Existing tested backend calculations are preserved; no frontend scoring rules or courses are invented.
+4. Production authentication/SSO, deployment hardening, file uploads and live company-laptop Luna validation remain roadmap work. Demo identities are local synthetic selection, not production login.
+5. Assessment draft answers are held in the open dialog only; closing/reloading discards the unsent draft. Submitted results and histories persist in SQLite.
+6. Legacy pending assessments without Phase 2 snapshots still require reassignment; the existing explicit 409 is preserved.
+
+## Every Phase 3 changed file
+
+The four `.pytest_tmp` paths were already problematic/deleted in the working tree at Phase 3 start and tracked in the baseline commit. They are now removed from the index only (staged deletions), with ignore coverage. No other changes were staged. No commit or push occurred.
+
+- `.gitignore`
+- `NEXT_STEPS.md`
+- `README.md`
+- `backend/.pytest_tmp/test_detailed_tni_supported_le0/dataops.xlsx`
+- `backend/.pytest_tmp/test_detailed_tni_supported_le0/finance.xlsx`
+- `backend/.pytest_tmp/test_learning_exact_joins0/dataops.xlsx`
+- `backend/.pytest_tmp/test_learning_exact_joins0/finance.xlsx`
+- `backend/README.md`
+- `backend/main.py`
+- `backend/tests/test_frontend_integration.py`
+- `frontend/README.md`
+- `frontend/index.html`
+- `frontend/package-lock.json`
+- `frontend/package.json`
+- `frontend/public/favicon.svg`
+- `frontend/src/Admin.tsx`
+- `frontend/src/App.css`
+- `frontend/src/App.tsx`
+- `frontend/src/Employee.tsx`
+- `frontend/src/Governance.tsx`
+- `frontend/src/Leader.tsx`
+- `frontend/src/Manager.tsx`
+- `frontend/src/Reviewer.tsx`
+- `frontend/src/api.test.ts`
+- `frontend/src/api.ts`
+- `frontend/src/catalog.ts`
+- `frontend/src/format.ts`
+- `frontend/src/hooks.ts`
+- `frontend/src/index.css`
+- `frontend/src/main.tsx`
+- `frontend/src/reporting.test.tsx`
+- `frontend/src/test-setup.ts`
+- `frontend/src/types.ts`
+- `frontend/src/ui.tsx`
+- `frontend/src/workflows.test.tsx`
+- `frontend/vite.config.ts`
+- `frontend/vitest.config.ts`
+
+## Next work
+
+- Obtain authorized source fixes/documents and validate policy/mapping acceptance without inventing missing data.
+- Run company-laptop Luna validation only when explicitly authorized there; keep secrets local.
+- Plan production identity, deployment, migrations and protected binary evidence storage separately.
+- Use the root README presentation walkthrough for the current synthetic demo.
+
+---
+
+## Historical Phase 1 and Phase 2 reports
+
 # Talent360i prioritized implementation checklist
 
 Baseline audit: 2026-09-12, commit `a953cd2`. See PROJECT_CONTEXT.md for requirements, inventory, evidence, and check results.

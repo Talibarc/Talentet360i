@@ -1,75 +1,28 @@
-# React + TypeScript + Vite
+# Talent360i frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19, TypeScript and Vite, using the existing Lucide icons and Recharts stack. The shared navy/indigo/teal component system supports desktop and mobile role workspaces.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From the repository root, start the seeded mock backend as described in the root README, then:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+npm.cmd --prefix frontend ci --cache .cache/npm --no-audit --no-fund
+npm.cmd --prefix frontend run dev -- --strictPort
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://127.0.0.1:5173 and select a synthetic role/function. No frontend environment secrets are required. `/api` proxies to the local backend on port 8000. Production hosting must supply that proxy; the build does not embed backend credentials.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Check
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run lint
+npm.cmd --prefix frontend run build
 ```
+
+Vitest and Testing Library exercise role navigation, dynamic IDs, answer privacy, submission payloads, source-bound TNI, evidence, manager revisions/comments, notifications, audit filtering, leader filters, engagement claims and API error handling. Tests use synthetic fixtures and mocked fetch, with no backend or Luna connection. `npm run format` formats source with Prettier.
+
+`api.ts` centralizes requests, errors and demo headers. `hooks.ts` manages cancellable reads and loading states. `ui.tsx` provides shared cards, forms, dialogs and status components. Role pages use backend-calculated results and never reproduce scoring formulas. API authorization remains authoritative; hiding a navigation item is not the security boundary.
+
+Source documents, missing Finance references, real scoring-policy acceptance, production identity/SSO and binary evidence upload remain outside the completed synthetic demo. See the root README and NEXT_STEPS.md.

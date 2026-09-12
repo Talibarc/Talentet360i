@@ -6,6 +6,10 @@ node_modules/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp/
+coverage/
+playwright-report/
+test-results/
 .cache/
 .coverage
 htmlcov/
@@ -19,4 +23,3 @@ dist/
 build/
 *.tsbuildinfo
 *.log
-

@@ -1,6 +1,6 @@
 # Talent360i Phase 2 backend demo
 
-The backend supports Finance and DataOps in one application. This phase adds demo authorization, question history, frozen assessments, evidence submission/history, manager review, official skill levels, leader aggregates, notifications, append-only audit events, and SkillQuest/XP. No frontend work is included.
+The backend supports Finance and DataOps in one application. This phase adds demo authorization, question history, frozen assessments, evidence submission/history, manager review, official skill levels, leader aggregates, notifications, append-only audit events, and SkillQuest/XP. This document describes the Phase 2 API; Phase 3 now connects the role-based frontend.
 
 ## Start a synthetic demo
 
@@ -69,3 +69,7 @@ git diff --check
 ```
 
 Phase 1 assertions remain unchanged. Their client fixture now uses an explicit privileged test dependency override so those existing workflow tests can run behind authorization. New Phase 2 tests use real demo headers and exercise authorization without that override. All tests disable actual dotenv loading and remove inherited Luna/CIS credentials. Provider contract tests use synthetic placeholders/fake transports only. No real Luna call occurs. Persistence tests use temporary SQLite files, and learning tests use temporary fictional workbooks.
+
+## Phase 3 integration addition
+
+`GET /demo/identities` is available only with `LLM_PROVIDER=mock` and a loopback client. It returns role/function labels and current numeric IDs only for explicit synthetic seed identities with a `demo.identity_created` audit event, `DEMO-` code and `@example.invalid` email. It does not enumerate arbitrary users or return email addresses. Empty seed state returns an empty list; non-mock/nonlocal requests return 403. All existing protected routes continue to require their role-scoped demo header. Three integration tests cover discovery and denial cases; the original 85 tests remain passing.
