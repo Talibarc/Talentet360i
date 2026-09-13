@@ -6,7 +6,7 @@ from database import Base, engine, SessionLocal
 from event_service import audit
 
 
-def seed_demo():
+def seed_demo(source_mode=False):
     if config.LLM_PROVIDER != "mock":
         raise RuntimeError("Synthetic demo setup requires LLM_PROVIDER=mock")
     Base.metadata.create_all(engine)
@@ -33,6 +33,24 @@ def seed_demo():
         user("DEMO-LD", "ld")
         mappings = []
         for function in ("Finance", "DataOps"):
+            if source_mode:
+                role = db.query(models.Role).filter_by(business_function=function).order_by(models.Role.id).first()
+                if function == "Finance":
+                    scope = db.query(models.QuestionScope).join(models.Question).filter(models.Question.status == "approved").order_by(models.Question.id).first()
+                    if scope:
+                        mapping = db.get(models.RoleSkillMap, scope.role_skill_map_id)
+                        role = db.get(models.Role, mapping.role_id)
+                if not role:
+                    raise RuntimeError("Import workbook roles before seeding demo identities")
+                manager = user(f"DEMO-{function}-MANAGER", "manager", function)
+                user(f"DEMO-{function}-REVIEWER", "reviewer", function)
+                user(f"DEMO-{function}-LEADER", "leader", function)
+                employee = user(f"DEMO-{function}-EMPLOYEE", "employee", function, role.id, manager.id)
+                details = db.get(models.UserProfile, employee.id)
+                if details:
+                    details.job_role_id = role.id
+                mappings.append({"function": function, "role_id": role.id})
+                continue
             role = db.query(models.Role).filter_by(role_code=f"DEMO-{function}").first()
             if not role:
                 role = models.Role(role_code=f"DEMO-{function}", role_name=f"Synthetic {function} Analyst",

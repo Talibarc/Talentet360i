@@ -22,6 +22,7 @@ export interface Role {
 export interface Skill {
   id: number;
   name: string;
+  category?: string | null;
 }
 export interface Mapping {
   id: number;
@@ -112,13 +113,14 @@ export interface Resource {
   source_row: number;
   level_scope: string | null;
   review_status: string | null;
+  availability_status?: string | null;
 }
 export interface Gap {
   assessment_id: number;
   skill_name: string;
-  current_level: number;
+  current_level: number | null;
   target_level: number;
-  skill_gap: number;
+  skill_gap: number | null;
   official_confirmed_level: number | null;
   review_status: string;
   learning_status: string;
@@ -135,7 +137,7 @@ export interface Tni {
   target_met: number;
   development_needed: number;
   skill_gaps: Gap[];
-  unassessed_skills: { skill_name: string; target_level: number }[];
+  unassessed_skills: { skill_name: string; target_level: number; target_label?: string; learning_resources?: Resource[]; learning_status?: string }[];
 }
 export interface Notice {
   id: number;

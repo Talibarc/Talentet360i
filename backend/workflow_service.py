@@ -109,8 +109,10 @@ def decide_result(db, actor, assessment_id, payload):
     if not assessment:
         raise HTTPException(404, "Assessment not found")
     manager_access(db, actor, assessment.employee_id)
-    if assessment.status != "submitted" or assessment.achieved_level is None:
-        raise HTTPException(409, "Only calculated submitted results can be reviewed")
+    if assessment.status != "submitted":
+        raise HTTPException(409, "Only submitted results can be reviewed")
+    if payload.decision == "confirm" and assessment.achieved_level is None:
+        raise HTTPException(409, "Result pending policy validation; no official level can be inferred")
     mapping = db.get(models.RoleSkillMap, assessment.role_skill_map_id)
     member = db.get(models.UserProfile, assessment.employee_id)
     if not mapping or not mapping.is_expected or mapping.target_level is None or member.job_role_id != mapping.role_id:

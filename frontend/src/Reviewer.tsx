@@ -7,9 +7,11 @@ import { ActionForm, Chip, DataState, Empty, Field, Panel } from "./ui";
 export default function Reviewer({
   api,
   refresh,
+  businessFunction,
 }: {
   api: Api;
   refresh: () => void;
+  businessFunction?: string | null;
 }) {
   const [version, setVersion] = useState(0),
     [selected, setSelected] = useState<number | null>(null),
@@ -60,8 +62,9 @@ export default function Reviewer({
                 (q) => status === "all" || q.status === status,
               ) && (
                 <Empty>
-                  No questions in this queue. Generate drafts from the Admin
-                  workspace.
+                  {businessFunction === "DataOps"
+                    ? "No approved DataOps question rows are available. The referenced external source is unavailable in Phase 4."
+                    : "No questions in this queue. Generate drafts from the Admin workspace."}
                 </Empty>
               )}
             </Panel>

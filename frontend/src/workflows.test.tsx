@@ -113,6 +113,7 @@ describe("role workflows", () => {
         review_status: "not_submitted",
       },
       "/assessments/501/submit": { status: "submitted" },
+      "/assessments/501/start": { status: "in_progress" },
     });
     const refresh = vi.fn();
     render(
@@ -125,9 +126,10 @@ describe("role workflows", () => {
       />,
     );
     await userEvent.click(
-      await screen.findByRole("button", { name: "Start assessment" }),
+      await screen.findByRole("button", { name: "Start Assessment" }),
     );
     await screen.findByText("Choose a synthetic action");
+    expect(api).toHaveBeenCalledWith("/assessments/501/start", "POST");
     expect(
       screen.queryByText("Hidden answer rationale"),
     ).not.toBeInTheDocument();

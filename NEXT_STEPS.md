@@ -1,4 +1,61 @@
-# Talent360i Phase 3 verification and next steps
+# Talent360i Phase 4 verification and next steps
+
+Phase 4 completed on 2026-09-13 in mock mode. The original Finance and RD workbooks were read without modification, and the SME clarification workbook was validated from its local attachment location without copying it into the repository.
+
+## Phase 4 verified results
+
+| Check | Result |
+| --- | --- |
+| Fresh import | **PASS:** 382 stable provenance records created. |
+| Repeat import | **PASS:** 0 changes; entity IDs and question revision counts remained stable. |
+| Finance | **PASS:** 28 skills, 9 selected roles, 12 role-description metadata records, 60 valid mappings, 49 safe questions, 30 valid learning mappings. Of 115 question rows, 36 were incomplete; the safe set is 23 Approved, 21 Pending SME Review and 5 Needs Rewrite. |
+| RD/DataOps | **PASS:** 38 skills, B2/B3/B4 roles, 114 matrix cells (86 Expected, 28 Not Expected), 38 learning metadata records and 1 unavailable Faiza question-source reference. No DataOps questions were claimed or generated. |
+| Backend suite | **PASS: 101 passed, 0 failed, 4 warnings in 30.27 s.** |
+| Frontend suite | **PASS: 24 passed, 0 failed, 4 files in 9.90 s.** |
+| Frontend lint/build | **PASS:** lint exit 0; production build exit 0 in 1.29 s. |
+| Browser | **PASS:** Finance and DataOps Employee, SME/Reviewer, Manager and Leader; Admin and L&D source/mapping views. Empty states, access scoping, source limitations and confirmed-only leader reporting verified. |
+| Repository checks | **PASS:** `git diff --check` and cached check exit 0 before final staging. Original workbook hashes remained unchanged. |
+| Provider | **PASS:** `LLM_PROVIDER=mock`; Luna was neither requested nor called. |
+
+## Phase 4 source and policy blockers
+
+1. Finance has 30 invalid role-map rows covering 13 distinct missing R2R skill references. A further 30 question rows lack an exact valid role/skill/target mapping, and 13 training mappings lack a valid skill or course reference. None were invented.
+2. The confirmed 20-question starting blueprint requires 6 Difficult, 8 Moderate and 6 Easy questions. No Finance role has a sufficient approved pool, and its source difficulty labels are Role Ready/Advanced. Valid workbook assessment assignment therefore remains blocked.
+3. RD/DataOps contains no question rows. The referenced Faiza Microsoft List was not accessed in Phase 4, so generation and assessment remain blocked.
+4. Twenty questions cannot cover all 31 B3 or 38 B4 expected competencies. The source does not resolve that blueprint conflict or supply enough questions for the 70% reassessment-new rule.
+5. The workbooks do not define a complete Beginner/Moderate/Expert score calculation or the meaning of greater-than-90% document matching. Workbook results remain pending policy validation; Expert additionally requires complex-case evidence and manager/SME confirmation.
+6. Eight RD learning rows have no URL. Linked workbook resources remain metadata and are not claimed as approved course or SOP content.
+
+## Phase 4 changed files
+
+- `.gitignore`
+- `README.md`
+- `NEXT_STEPS.md`
+- `PROJECT_CONTEXT.md`
+- `backend/assessment_service.py`
+- `backend/governance_service.py`
+- `backend/main.py`
+- `backend/models.py`
+- `backend/schemas.py`
+- `backend/seed_demo.py`
+- `backend/seed_workbook_demo.py`
+- `backend/source_import.py`
+- `backend/tests/test_source_integration.py`
+- `backend/tni_service.py`
+- `backend/workflow_service.py`
+- `frontend/src/Admin.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/Employee.tsx`
+- `frontend/src/Manager.tsx`
+- `frontend/src/Reviewer.tsx`
+- `frontend/src/catalog.ts`
+- `frontend/src/source-integration.test.tsx`
+- `frontend/src/types.ts`
+- `frontend/src/workflows.test.tsx`
+
+---
+
+## Historical Phase 3 verification
 
 Phase 3 completed on 2026-09-12 against baseline `d6d5b5b`. The responsive frontend connects the existing mock backend. No commit or push was made. The Phase 1/2 reports below are retained as historical records.
 

@@ -179,7 +179,7 @@ export default function App() {
                 </Empty>
               )}
               <div className="source-note">
-                Mock mode · Synthetic exercises · No Luna connection
+                Mock mode · Demo identities · No Luna connection
               </div>
             </Panel>
           </main>
@@ -210,17 +210,17 @@ function Workspace({
     [page, setPage] = useState(""),
     [mobile, setMobile] = useState(false);
 
-  const me = useResource<User>(api, "/me"),
+  const me = useResource<User>(api, "/me", version),
     count = useResource<{ unread_count: number }>(
       api,
       "/notifications/unread-count",
       version,
     );
 
-  const roles = useResource<Role[]>(api, "/roles"),
-    skills = useResource<Skill[]>(api, "/skills"),
-    mappings = useResource<Mapping[]>(api, "/role-skill-maps"),
-    users = useResource<User[]>(api, "/users");
+  const roles = useResource<Role[]>(api, "/roles", version),
+    skills = useResource<Skill[]>(api, "/skills", version),
+    mappings = useResource<Mapping[]>(api, "/role-skill-maps", version),
+    users = useResource<User[]>(api, "/users", version);
 
   const refresh = () => {
     setVersion((v) => v + 1);
@@ -282,7 +282,7 @@ function Workspace({
                   <br />
                   Manager-confirmed proficiency.
                 </p>
-                <span>LOCAL SYNTHETIC DEMO</span>
+                <span>LOCAL DEMO</span>
               </div>
             </aside>
             {mobile && (
@@ -370,7 +370,11 @@ function Workspace({
                     {active.id === "admin" ? (
                       <Admin api={api} catalog={catalog} refresh={refresh} />
                     ) : active.id === "review" ? (
-                      <Reviewer api={api} refresh={refresh} />
+                      <Reviewer
+                        api={api}
+                        refresh={refresh}
+                        businessFunction={user.business_function}
+                      />
                     ) : ["home", "learning", "evidence", "quests"].includes(
                         active.id,
                       ) ? (
@@ -399,7 +403,7 @@ function Workspace({
                   </div>
                 )}
                 <footer>
-                  Talent360i · Mock exercises are synthetic. Official levels
+                  Talent360i · Question provenance is retained. Official levels
                   require manager confirmation. XP is engagement-only.
                 </footer>
               </main>

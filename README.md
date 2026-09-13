@@ -1,6 +1,6 @@
 # Talent360i skills and development workspace
 
-Phase 3 connects a responsive React/TypeScript frontend to the working FastAPI/SQLite mock backend. Admin/L&D, SME/Reviewer, Employee, Manager, and Leader work in one Finance/DataOps application with source governance, assessments, learning, evidence, notifications, and engagement XP. See [backend/README.md](backend/README.md) for demo identities, role permissions and the full API walkthrough.
+Phase 4 adds read-only, traceable imports from the supplied Finance and RD/DataOps workbooks to the responsive React/TypeScript and FastAPI application. Stable workbook keys, sheet/row provenance, review status, source limitations and SME policy safeguards are retained. Unsupported records remain blocked rather than being inferred. See [backend/README.md](backend/README.md) for demo identities, role permissions and the full API walkthrough.
 
 ## Install on Windows
 
@@ -35,7 +35,9 @@ Restart the backend after configuration changes. Existing process environment va
 
 ```powershell
 $env:LLM_PROVIDER = 'mock'
-backend/.venv/Scripts/python.exe backend/seed_demo.py
+$env:PYTHON_DOTENV_DISABLED = '1'
+$env:DATABASE_URL = 'sqlite:///C:/Users/talib/Talentet360i/backend/phase4-demo.sqlite'
+backend/.venv/Scripts/python.exe backend/seed_workbook_demo.py
 backend/.venv/Scripts/python.exe -m uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 --no-proxy-headers
 ```
 
@@ -71,12 +73,12 @@ For manual API testing, select the seeded Reviewer, Manager, Employee and Leader
 - Luna continues through the unchanged `llm_service.py` transport. The new provider boundary validates question count/options and structured TNI. No live Luna call was made during any implementation phase.
 - Detailed TNI separates calculated and official manager-confirmed levels and includes targets, gaps, unassessed skills, next steps and mapped learning resources. Scoring is deterministic application code, never an LLM decision.
 - Learning lookup uses exact source skill-name/ID joins: Finance Skill_Master → Training_Skill_Map → Training_Catalogue, and DataOps Skill Master → SOP & Learning Mapping. Titles/URLs/citations come only from source rows; ambiguous or absent joins return no resources. Source level/review metadata is preserved where available. These are skill-mapped candidates, not a claimed level-specific or approved curriculum.
-- The inherited score bands remain provisional: at least 95% gives target level; above 80% gives target minus one with the existing level-one floor; otherwise target minus two with a zero floor. A zero target stays zero. Source-referenced policy configuration and critical-fail execution are implemented, but actual company policies remain unresolved.
+- Legacy synthetic assessments retain their tested provisional score bands. Workbook-backed results calculate an objective score but leave proficiency and skill gaps pending because neither workbook contains an approved score-to-level policy. A difficult/critical error is retained as a review insight and does not automatically fail the assessment.
 - Blank targets are Not Expected. They cannot generate questions or receive/submit assessments and are excluded from TNI. Duplicate answer IDs are rejected. Assessment selection is randomized across approved questions for the mapping/level and stores frozen question/policy snapshots. Question revisions and decisions are retained.
 
 `NEXT_STEPS.md` contains verified results, every changed file, and unresolved blockers. `PROJECT_CONTEXT.md` retains the initial audit and stable requirements. No dependencies, environments, databases, secrets, caches, or build output are intended for Git.
 
-## Use the Phase 3 frontend
+## Use the Phase 4 frontend
 
 Open http://127.0.0.1:5173. Select a synthetic identity by role/function; the application discovers seeded IDs from the mock-only loopback endpoint `/demo/identities`. It never assumes numeric database IDs. Every protected request uses the centralized API client and `x-demo-user-id`. Switching identities remounts the workspace and clears prior role data. Reload returns to identity selection.
 
@@ -106,11 +108,12 @@ Adjust the absolute database path if your checkout is elsewhere. The Phase 3 vis
 
 Loading skeletons, empty states, inline errors, success messages, native accessible dialogs, keyboard focus, and responsive navigation are included. HTTP 401/403/404/409/422 have centralized guidance; backend details explain source and workflow conflicts. Draft assessment answers are held only while the assessment dialog stays open.
 
-### Verified Phase 3 checks
+### Verified Phase 4 checks
 
-- Backend: **88 passed**, including all **85 prior tests**, 0 failures/errors; 2 existing upstream deprecation warnings.
-- Frontend: **22 passed**, 0 failures; lint and production build exit 0.
-- Browser: Finance and DataOps generation-to-confirmation flows; evidence send-back/resubmission, TNI, XP claim, notifications and confirmed reporting. Major role pages inspected at desktop and mobile sizes.
-- Original Luna transport/config/provider behavior and the two source workbooks are preserved. No Luna key was requested or live Luna call made.
+- Backend: **101 passed**, including every Phase 3 regression, 0 failures/errors; 4 warnings from upstream libraries/workbook extensions.
+- Frontend: **24 passed**, 0 failures; lint and production build exit 0.
+- Import: fresh database **382 source records**; repeat import **0 changes**. Finance imports 28 skills, 9 selected roles, 12 role-description records, 60 mappings, 49 safe questions and 30 learning mappings. RD imports 38 skills, 3 bands, 114 matrix mappings, 38 learning metadata records and one unavailable external question-source reference.
+- Browser: Finance and DataOps Employee, Reviewer, Manager and Leader views plus Admin/L&D were verified against the fresh workbook database. Empty/source-limitation states and confirmed-only reporting render correctly.
+- Original Luna transport/config/provider behavior and both authoritative workbooks are preserved. The SME clarification workbook remains outside Git. No Luna key was requested and no live Luna call was made.
 
 See `NEXT_STEPS.md` for exact checks, changed files, known source limitations, and repository hygiene details.

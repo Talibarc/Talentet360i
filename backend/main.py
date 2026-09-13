@@ -196,7 +196,21 @@ def create_skill(payload: schemas.SkillCreate, db: DbSession, actor: Actor):
 
 @app.get("/skills", response_model=list[schemas.SkillResponse])
 def list_skills(db: DbSession, actor: Actor):
-    return db.query(models.Skill).order_by(models.Skill.id).all()
+    query = db.query(models.Skill)
+    if actor.role not in {"admin", "ld"}:
+        details = profile(db, actor.id)
+        query = query.join(models.RoleSkillMap).join(models.Role).filter(
+            models.Role.business_function == (details.business_function if details else ""))
+        if actor.role == "employee":
+            query = query.filter(models.Role.id == (details.job_role_id if details else -1))
+    result = []
+    for skill in query.distinct().order_by(models.Skill.id):
+        item = schemas.SkillResponse.model_validate(skill).model_dump()
+        source = db.query(models.SourceRecord).filter_by(entity_type="skill", entity_id=skill.id).first()
+        if source:
+            item.update(category=source.details.get("category"), source_key=source.source_key)
+        result.append(item)
+    return result
 
 
 @app.post("/role-skill-maps", response_model=schemas.RoleSkillMapResponse, status_code=201)
@@ -248,6 +262,37 @@ def validate_source_data(db: DbSession, actor: Actor):
         return {"status": "blocked", "issues": [{"issue": "Required workbook or sheet unavailable"}]}
 
 
+@app.get("/data/inventory")
+def source_inventory(db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    from source_import import source_plan
+    return source_plan()[1]
+
+
+@app.post("/data/import")
+def import_source_data(db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    if config.LLM_PROVIDER != "mock":
+        raise HTTPException(409, "Source import requires mock mode")
+    from source_import import import_sources
+    return import_sources(db, actor.id)
+
+
+@app.post("/assessments/{assessment_id}/start")
+def start_assessment(assessment_id: int, db: DbSession, actor: Actor):
+    require(actor, "employee")
+    assessment = db.get(models.Assessment, assessment_id)
+    if not assessment:
+        raise HTTPException(404, "Assessment not found")
+    employee_access(db, actor, assessment.employee_id, write=True)
+    if assessment.status == "submitted":
+        raise HTTPException(409, "Assessment already submitted")
+    if assessment.status == "assigned":
+        assessment.status = "in_progress"
+        audit(db, actor.id, "assessment.started", "assessment", assessment.id, subject_id=actor.id)
+    return {"status": assessment.status}
+
+
 @app.get("/sources/status")
 def source_status(db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
@@ -258,7 +303,7 @@ def source_status(db: DbSession, actor: Actor):
         return {"status": "blocked", "reason": "Required source workbook unavailable", "approved_sop_available": False}
     return {"status": "needs_review", "missing_finance_skill_references": missing,
             "approved_sop_available": False,
-            "reason": "Approved SOP/training documents have not been supplied or registered; mock exercises are synthetic"}
+            "reason": "Approved SOP documents are not supplied. Workbook mappings require source validation; linked resources are not approved document content."}
 
 
 @app.get("/rag/context")
@@ -276,6 +321,8 @@ def rag_context(role_name: str, skill_name: str, db: DbSession, actor: Actor):
 def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
     mapping = mapping_access(db, actor, payload.role_skill_map_id)
+    if db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first():
+        raise HTTPException(409, "Workbook-backed mappings use imported questions only. Mapping unavailable — pending source validation.")
     if not mapping.is_expected or mapping.target_level is None:
         raise HTTPException(400, "Questions cannot be generated for a non-expected skill")
     if payload.require_approved_sop:

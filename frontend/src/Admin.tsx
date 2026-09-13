@@ -37,7 +37,7 @@ export function MappingSelect({
         )
         .map((m) => (
           <option value={m.id} key={m.id}>
-            {mappingName(catalog, m.id)} · L{m.target_level}
+            {mappingName(catalog, m.id)} · {m.target_label ?? `Level ${m.target_level}`}
           </option>
         ))}
     </select>
@@ -103,7 +103,7 @@ export function Assignment({
               type="number"
               min="1"
               max="20"
-              defaultValue="3"
+              defaultValue="20"
               required
             />
           </Field>
@@ -164,6 +164,11 @@ export default function Admin({
         )}
       </DataState>
       <div className="two-col">
+        <Panel title="Workbook source integration">
+          <p>Original Finance and RD workbooks supply mappings and eligible questions. Unsupported records remain pending source validation.</p>
+          <ActionForm label="Validate source inventory" onSubmit={async () => setValidation(await api("/data/inventory"))} success={() => {}}><span /></ActionForm>
+          <ActionForm label="Import workbook mappings" onSubmit={async () => setValidation(await api("/data/import", "POST"))} success={refresh}><span /></ActionForm>
+        </Panel>
         <Panel title="Generate question drafts">
           <p className="muted">
             Drafts require SME approval before assignment. Mock content does not
@@ -259,13 +264,14 @@ export default function Admin({
                     <tr key={m.id}>
                       <td>
                         {catalog.skills.find((s) => s.id === m.skill_id)?.name}
+                        <small>{catalog.skills.find((s) => s.id === m.skill_id)?.category}</small>
                       </td>
                       <td>{r?.role_name}</td>
                       <td>{r?.business_function}</td>
                       <td>
                         {m.target_level === null
                           ? "Not Expected"
-                          : `Level ${m.target_level}`}
+                          : m.target_label ?? `Level ${m.target_level}`}
                       </td>
                       <td>
                         <Chip>

@@ -42,6 +42,11 @@ def scoped_question(db, actor, question_id):
 
 def review(db, actor, question_id, payload):
     question = scoped_question(db, actor, question_id)
+    source = db.query(models.SourceRecord).filter_by(entity_type="question", entity_id=question_id).first()
+    revision = latest_revision(db, question_id)
+    if (payload.status == "approved" and source and source.details.get("source_status") == "Needs Rewrite"
+            and revision and revision.action == "source_imported"):
+        raise HTTPException(409, "Workbook marks this question Needs Rewrite; edit a new revision before approval")
     # Compare-and-set avoids duplicate competing reviews in a single transition.
     changed = db.execute(update(models.Question).where(models.Question.id == question_id,
         models.Question.status == "pending_review").values(status=payload.status,

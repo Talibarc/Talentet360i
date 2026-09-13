@@ -157,6 +157,21 @@ class QuestionRevision(Base):
     __table_args__ = (UniqueConstraint("question_id", "revision"),)
 
 
+class SourceRecord(Base):
+    """Stable workbook identity and provenance; no source files are rewritten."""
+    __tablename__ = "source_records"
+    id = Column(Integer, primary_key=True)
+    workbook = Column(String(100), nullable=False)
+    sheet = Column(String(100), nullable=False)
+    source_key = Column(String(250), nullable=False)
+    entity_type = Column(String(30), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    source_row = Column(Integer, nullable=False)
+    fingerprint = Column(String(64), nullable=False)
+    details = Column(JSON, nullable=False)
+    __table_args__ = (UniqueConstraint("workbook", "sheet", "source_key"),)
+
+
 class ScoringPolicy(Base):
     __tablename__ = "scoring_policies"
     id = Column(Integer, primary_key=True)

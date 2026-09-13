@@ -95,7 +95,7 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
                 <div className="level-comparison">
                   <div>
                     <small>Calculated / provisional</small>
-                    <strong>Level {g.current_level}</strong>
+                    <strong>{g.current_level === null ? "Pending policy validation" : `Level ${g.current_level}`}</strong>
                   </div>
                   <div>
                     <small>Official confirmed</small>
@@ -139,6 +139,7 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
                       <p>
                         Scope: {r.level_scope ?? "Not supplied"} · Approval:{" "}
                         {r.review_status ?? "Not supplied"}
+                        {r.availability_status ? ` · Availability: ${r.availability_status.replaceAll("_", " ")}` : ""}
                       </p>
                     </div>
                   ))
@@ -163,9 +164,11 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
               <div>
                 <strong>{s.skill_name}</strong>
                 <p>
-                  Target level {s.target_level} · Current level has not been
+                  Target {s.target_label ?? `level ${s.target_level}`} · Current level has not been
                   calculated.
                 </p>
+                {s.learning_resources?.map((r) => <p key={r.resource_id}>{safeUrl(r.url) ? <a href={safeUrl(r.url)} target="_blank" rel="noreferrer">{r.title}</a> : r.title} <small>{r.source_file}, row {r.source_row}</small></p>)}
+                {s.learning_resources?.length === 0 && <p>Mapping unavailable — pending source validation.</p>}
               </div>
               <Chip>not_assessed</Chip>
             </div>
@@ -196,7 +199,8 @@ export default function Employee({
   const [version, setVersion] = useState(0),
     [assessment, setAssessment] = useState<number | null>(null),
     [history, setHistory] = useState<string | null>(null),
-    [edit, setEdit] = useState<Evidence | null>(null);
+    [edit, setEdit] = useState<Evidence | null>(null),
+    [startError, setStartError] = useState("");
   const assessments = useResource<Assessment[]>(api, "/assessments", version),
     evidence = useResource<Evidence[]>(api, "/evidence", version);
   const update = () => {
@@ -318,6 +322,7 @@ export default function Employee({
             </div>
           </div>
           <Panel title="Your assessments">
+            {startError && <p role="alert">{startError}</p>}
             <DataState state={assessments}>
               {(rows) =>
                 rows.length ? (
@@ -341,7 +346,7 @@ export default function Employee({
                             </div>
                             <div>
                               <small>Calculated / provisional</small>
-                              <strong>Level {a.achieved_level}</strong>
+                              <strong>{a.achieved_level === null ? "Pending policy validation" : `Level ${a.achieved_level}`}</strong>
                             </div>
                             <div>
                               <small>Engagement</small>
@@ -355,9 +360,18 @@ export default function Employee({
                       ) : (
                         <button
                           className="primary"
-                          onClick={() => setAssessment(a.id)}
+                          onClick={async () => {
+                            setStartError("");
+                            try {
+                              await api(`/assessments/${a.id}/start`, "POST");
+                              setAssessment(a.id);
+                              setVersion((v) => v + 1);
+                            } catch (error) {
+                              setStartError(error instanceof Error ? error.message : "Could not start assessment. Please retry.");
+                            }
+                          }}
                         >
-                          Start assessment
+                          {a.status === "in_progress" ? "Resume assessment" : "Start Assessment"}
                         </button>
                       )}
                     </div>
@@ -365,7 +379,7 @@ export default function Employee({
                 ) : (
                   <Empty>
                     No assessment assigned yet. Your manager or L&D can assign
-                    approved questions.
+                    approved questions. {user.business_function === "DataOps" && "DataOps assessment questions are pending an approved source. Mapping unavailable — pending source validation."}
                   </Empty>
                 )
               }
@@ -471,7 +485,7 @@ function AssessmentScreen({
               />
               <Stat
                 label="Provisional level"
-                value={d.assessment.achieved_level}
+                value={d.assessment.achieved_level ?? "Pending policy validation"}
                 note="Official level requires manager confirmation"
               />
             </div>

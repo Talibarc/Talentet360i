@@ -25,6 +25,8 @@ class SkillCreate(BaseModel):
  
 class SkillResponse(SkillCreate):
     id: int
+    category: str | None = None
+    source_key: str | None = None
  
     model_config = ConfigDict(from_attributes=True)
  
@@ -141,6 +143,7 @@ class LearningResource(BaseModel):
     source_skill_id: str
     level_scope: str | None = None
     review_status: str | None = None
+    availability_status: str | None = None
 
 
 class TniNarrative(BaseModel):
@@ -158,9 +161,9 @@ class TniSkillGap(BaseModel):
     skill_id: int
     skill_name: str
     score_percentage: int
-    current_level: int
+    current_level: int | None
     target_level: int
-    skill_gap: int
+    skill_gap: int | None
     gap_status: str
     expert_confirmation_required: bool
     recommendation: str

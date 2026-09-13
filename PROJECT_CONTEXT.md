@@ -1,5 +1,13 @@
 # Talent360i project context and repository audit
 
+## Phase 4 source integration status — 2026-09-13
+
+Phase 4 imports the two authoritative repository workbooks through stable source keys and records workbook, sheet, row, fingerprint and source metadata. Imports are read-only and idempotent. Finance review status controls eligibility; incomplete or referentially invalid records are skipped with exact reasons. RD blank targets are `Not Expected` and never create gaps. The external Faiza list remains unavailable and contributes no question rows.
+
+The SME clarification register confirms a 20-question start with 6 Difficult, 8 Moderate and 6 Easy questions, difficult/critical mistakes as review insights, at least 70% new reassessment questions, all required-role-skill coverage, and additional evidence plus manager/SME confirmation for Expert. AI confidence is preserved only for reviewer triage. Where the source pool or policy cannot satisfy these rules, the backend returns an explicit conflict and leaves proficiency pending.
+
+Verified Phase 4 state: 382 source records on a fresh database and 0 changes on repeat import; 101 backend tests and 24 frontend tests pass; lint and production build pass. Browser checks cover both functions and all five role experiences. Luna was not called.
+
 Audit date: 2026-09-12. Baseline commit: `a953cd2`. The findings below describe the initial repository before implementation. The user subsequently authorized Phase 1 and Phase 2 backend work. See NEXT_STEPS.md for current verified results, README.md for setup, and backend/README.md for the protected demo API. The historical status matrix below is not a description of the updated code.
 
 ## Stable requirements

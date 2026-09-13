@@ -82,7 +82,7 @@ export default function Manager({
                       <div className="row">
                         <span>
                           Score {a.score_percentage}% · Provisional level{" "}
-                          {a.achieved_level}
+                          {a.achieved_level ?? "Pending policy validation"}
                         </span>
                         <button
                           className="primary"
@@ -210,7 +210,7 @@ export default function Manager({
               <strong>Selected assessment {selected.id}</strong>
               <p>
                 Score: {selected.score ?? "Not assessed"}% · Calculated level:{" "}
-                {selected.level ?? "Not assessed"}
+                {selected.level ?? "Pending policy validation"}
               </p>
             </div>
           )}
@@ -237,8 +237,8 @@ export default function Manager({
                 confirmed level. All linked evidence must be confirmed first.
               </p>
               <Field label="Decision">
-                <select name="decision">
-                  <option value="confirm">Confirm</option>
+                <select name="decision" defaultValue={selected.type === "assessments" && selected.level === null ? "send_back" : "confirm"}>
+                  <option value="confirm" disabled={selected.type === "assessments" && selected.level === null}>Confirm</option>
                   <option value="send_back">Send back</option>
                 </select>
               </Field>
