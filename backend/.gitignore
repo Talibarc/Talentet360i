@@ -1,5 +1,7 @@
 .env
 __pycache__/
+.rag_index/
+rag-manifest*.json
 *.pyc
 .venv/
 talent360i.db

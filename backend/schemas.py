@@ -53,6 +53,8 @@ class QuestionGenerateRequest(BaseModel):
     role_skill_map_id: int = Field(gt=0)
     question_count: int = Field(default=3, ge=1, le=5)
     require_approved_sop: bool = False
+    difficulty: Literal["Easy", "Moderate", "Difficult"] = "Moderate"
+    difficulty: Literal["Easy", "Moderate", "Difficult"] = "Moderate"
  
  
 class GeneratedQuestion(BaseModel):
@@ -79,6 +81,17 @@ class QuestionResponse(GeneratedQuestion):
     skill_level: int
     rag_source: str | None = None
     status: str
+    question_type: str | None = None
+    source_skill_id: str | None = None
+    target_proficiency: str | None = None
+    difficulty: str | None = None
+    source_ids: list[str] = Field(default_factory=list)
+    chunk_references: list[str] = Field(default_factory=list)
+    document_references: list[str] = Field(default_factory=list)
+    ai_confidence: str | None = None
+    provider_name: str | None = None
+    provider_model: str | None = None
+    synthetic_only: bool = False
  
     model_config = ConfigDict(from_attributes=True)    
 
@@ -144,6 +157,10 @@ class LearningResource(BaseModel):
     level_scope: str | None = None
     review_status: str | None = None
     availability_status: str | None = None
+    ingestion_status: str | None = None
+    original_reference: str | None = None
+    source_type: str | None = None
+    owner: str | None = None
 
 
 class TniNarrative(BaseModel):

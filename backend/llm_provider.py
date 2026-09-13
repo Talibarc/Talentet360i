@@ -15,7 +15,8 @@ class LlmProvider(Protocol):
     name: str
 
     def questions(self, *, system_prompt: str, user_prompt: str, skill_name: str,
-                  target_level: int, question_count: int) -> list[GeneratedQuestion]: ...
+                  target_level: int, question_count: int,
+                  grounding: dict | None = None) -> list[GeneratedQuestion]: ...
 
     def tni(self, facts: dict, resources: list[dict]) -> TniNarrative: ...
 
@@ -24,7 +25,8 @@ class MockProvider:
     name = "mock"
 
     def questions(self, *, system_prompt: str, user_prompt: str, skill_name: str,
-                  target_level: int, question_count: int) -> list[GeneratedQuestion]:
+                  target_level: int, question_count: int,
+                  grounding: dict | None = None) -> list[GeneratedQuestion]:
         # Explicit fictional exercises: never represent these as company SOP rules.
         exercises = [
             ("a practice checklist requires comparing a total with its source before submission",
@@ -48,8 +50,21 @@ class MockProvider:
              ["Choose whichever is shorter", "Use an unapproved draft", "Combine conflicting steps arbitrarily"]),
         ]
         result = []
+        grounded_chunks = (grounding or {}).get("selected_chunks", [])
         for i in range(question_count):
-            context, scenario, correct, distractors = exercises[i % len(exercises)]
+            if grounded_chunks:
+                chunk = grounded_chunks[i % len(grounded_chunks)]
+                excerpt = chunk["text"][:220].strip()
+                context = f"the supplied test fixture states: {excerpt}"
+                scenario = f"Which statement is supported by {chunk['reference']}?"
+                correct = excerpt
+                distractors = [
+                    "The source gives no requirement and permits any approach",
+                    "The source requires using information from an unrelated skill",
+                    "The source says the review step must always be skipped",
+                ]
+            else:
+                context, scenario, correct, distractors = exercises[i % len(exercises)]
             correct_key = "ABCD"[i % 4]
             alternatives = iter(distractors)
             options = {key: correct if key == correct_key else next(alternatives) for key in "ABCD"}
@@ -96,7 +111,8 @@ class LunaProvider:
             raise ProviderError("Luna request failed; check company-laptop configuration") from None
 
     def questions(self, *, system_prompt: str, user_prompt: str, skill_name: str,
-                  target_level: int, question_count: int) -> list[GeneratedQuestion]:
+                  target_level: int, question_count: int,
+                  grounding: dict | None = None) -> list[GeneratedQuestion]:
         raw = self._generate(system_prompt, user_prompt)
         try:
             # Preserve support for the existing adapter's wrapped JSON responses.

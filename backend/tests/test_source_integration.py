@@ -51,7 +51,7 @@ def test_authoritative_inventory_and_frameworks(originals):
     for path in (source.FINANCE_FILE, source.RD_FILE):
         assert report["inventory"][path.name]["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert report["counts"][source.FINANCE_FILE.name] == dict(skill=28, role=9, role_description=12, mapping=60, question=49, learning=30)
-    assert report["counts"][source.RD_FILE.name] == dict(skill=38, role=3, mapping=114, learning=38, question_source=1)
+    assert report["counts"][source.RD_FILE.name] == dict(skill=38, role=3, mapping=114, learning=38, source_metadata=7, question_source=1)
     rd = [r["details"] for r in rows if r["workbook"] == source.RD_FILE.name and r["entity_type"] == "mapping"]
     assert Counter(r["role_key"] for r in rd if r["is_expected"]) == {"B2": 17, "B3": 31, "B4": 38}
     assert sum(r["target_level"] is None and not r["is_expected"] for r in rd) == 28
@@ -83,7 +83,7 @@ def test_import_idempotent_and_preserves_sources(planned):
         first = source.import_sources(db)
         ids = [(r.id, r.entity_id) for r in db.query(models.SourceRecord)]
         revisions = db.query(models.QuestionRevision).count()
-        assert first["changed"] == 382
+        assert first["changed"] == 389
         assert source.import_sources(db)["changed"] == 0
         assert [(r.id, r.entity_id) for r in db.query(models.SourceRecord)] == ids
         assert db.query(models.QuestionRevision).count() == revisions

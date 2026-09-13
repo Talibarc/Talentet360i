@@ -1,0 +1,3 @@
+Synthetic test instruction: verify that each practice record has a unique identifier before accepting the practice dataset.
+
+Synthetic test instruction: record a failed validation check before retrying the fictional workflow.

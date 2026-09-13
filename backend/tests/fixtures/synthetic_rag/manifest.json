@@ -1,0 +1,17 @@
+{
+  "sources": [
+    {
+      "source_id": "SYNTHETIC_RD_ADM_01",
+      "filename": "synthetic-item-processing.txt",
+      "skill_ids": ["RD_ADM_01"],
+      "source_type": "Synthetic training fixture",
+      "approved_for_generation": true,
+      "synthetic_only": true,
+      "function": "DataOps",
+      "title": "Synthetic Item Processing Training — Test Fixture Only",
+      "owner": "Automated tests",
+      "role_bands": ["B2", "B3", "B4"],
+      "intended_proficiencies": ["Beginner", "Moderate", "Expert"]
+    }
+  ]
+}

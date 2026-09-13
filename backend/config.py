@@ -23,3 +23,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip() or (
     f"sqlite:///{(ENV_FILE.parent / 'talent360i.db').as_posix()}"
 )
 
+RAG_SOURCE_DIR = Path(os.getenv("RAG_SOURCE_DIR", ENV_FILE.parent / "tests" / "fixtures" / "synthetic_rag"))
+RAG_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", ENV_FILE.parent / ".rag_index"))
+ALLOW_SYNTHETIC_RAG = os.getenv("ALLOW_SYNTHETIC_RAG", "false").strip().lower() in {"1", "true", "yes"}
+RAG_MAX_FILE_BYTES = int(os.getenv("RAG_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
+

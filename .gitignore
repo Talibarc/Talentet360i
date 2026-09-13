@@ -21,6 +21,10 @@ htmlcov/
 *.sqlite3-*
 dist/
 build/
+.rag_index/
+backend/.rag_index/
+rag-manifest*.json
+!backend/tests/fixtures/synthetic_rag/manifest.json
 *.tsbuildinfo
 *.log
 ~$*.xlsx

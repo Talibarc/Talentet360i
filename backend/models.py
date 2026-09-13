@@ -157,6 +157,24 @@ class QuestionRevision(Base):
     __table_args__ = (UniqueConstraint("question_id", "revision"),)
 
 
+class QuestionGrounding(Base):
+    """Provider-independent provenance for source-grounded generated drafts."""
+    __tablename__ = "question_groundings"
+    question_id = Column(ForeignKey("questions.id"), primary_key=True)
+    source_skill_id = Column(String(100), nullable=False, index=True)
+    target_proficiency = Column(String(50), nullable=False)
+    difficulty = Column(String(30), nullable=False)
+    question_type = Column(String(50), nullable=False)
+    source_ids = Column(JSON, nullable=False)
+    chunk_references = Column(JSON, nullable=False)
+    document_references = Column(JSON, nullable=False)
+    ai_confidence = Column(String(30), nullable=False)
+    provider_name = Column(String(30), nullable=False)
+    provider_model = Column(String(100), nullable=False)
+    synthetic_only = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+
 class SourceRecord(Base):
     """Stable workbook identity and provenance; no source files are rewritten."""
     __tablename__ = "source_records"

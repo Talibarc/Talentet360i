@@ -5,6 +5,8 @@ sqlalchemy
 pydantic
 python-dotenv
 openpyxl
+pypdf
+python-docx
+python-pptx
 azure-ai-inference
 azure-core
-

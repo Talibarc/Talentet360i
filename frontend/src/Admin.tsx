@@ -126,6 +126,18 @@ export default function Admin({
     missing_finance_skill_references?: number;
     reason: string;
     approved_sop_available: boolean;
+    ingested_source_count?: number;
+    local_rag_sources?: {
+      source_id: string;
+      title: string | null;
+      skill_ids: string[];
+      source_type: string;
+      availability_status: string;
+      ingestion_status: string;
+      chunk_count: number;
+      content_hash: string | null;
+      limitation: string | null;
+    }[];
   }>(api, "/sources/status");
   const [validation, setValidation] = useState<unknown>(),
     [context, setContext] = useState<unknown>(),
@@ -160,7 +172,20 @@ export default function Admin({
               SOP documents:{" "}
               {s.approved_sop_available ? "Available" : "Not available"}
             </p>
+            <p>Locally ingested approved sources: {s.ingested_source_count ?? 0}</p>
           </div>
+        )}
+      </DataState>
+      <DataState state={source}>
+        {(s) => (
+          <Panel title="Offline RAG source status">
+            <p className="muted">Metadata and version indicators only. Extracted document content is not displayed here.</p>
+            {s.local_rag_sources?.length ? (
+              <div className="table-scroll"><table><thead><tr><th>Source</th><th>Mapped skill</th><th>Type</th><th>Availability</th><th>Ingestion</th><th>Chunks</th><th>Version</th><th>Limitation</th></tr></thead><tbody>
+                {s.local_rag_sources.map((item) => <tr key={item.source_id}><td>{item.title ?? item.source_id}<small>{item.source_id}</small></td><td>{item.skill_ids.join(", ")}</td><td>{item.source_type}</td><td><Chip>{item.availability_status}</Chip></td><td>{item.ingestion_status}</td><td>{item.chunk_count}</td><td>{item.content_hash?.slice(0, 12) ?? "Not indexed"}</td><td>{item.limitation ?? "—"}</td></tr>)}
+              </tbody></table></div>
+            ) : <Empty>No local documents have been ingested. Workbook URLs remain metadata only.</Empty>}
+          </Panel>
         )}
       </DataState>
       <div className="two-col">

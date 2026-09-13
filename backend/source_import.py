@@ -212,10 +212,21 @@ def source_plan():
             issue(RD_FILE, "SOP & Learning Mapping", n, "Learning reference has no URL; metadata retained as unavailable", r["Skill_ID"])
         add(RD_FILE, "SOP & Learning Mapping", n, r["Skill_ID"], "learning", {
             "skill_key": r["Skill_ID"], "resource_id": f"dataops:{r['Skill_ID']}", "title": r["Reference title"],
-            "url": url if available else None, "source_file": RD_FILE.name, "source_sheet": "SOP & Learning Mapping",
+            # URLs remain audit metadata and are never treated as ingested knowledge.
+            "url": url if available else None, "original_reference": url if available else None,
+            "source_type": r.get("Source type"), "owner": r.get("Owner"),
+            "source_file": RD_FILE.name, "source_sheet": "SOP & Learning Mapping",
             "source_row": n, "mapping_sheet": "SOP & Learning Mapping", "mapping_row": n,
             "source_skill_id": r["Skill_ID"], "review_status": r.get("Review status"),
-            "availability_status": "linked_source_available" if available else "source_link_unavailable"})
+            "availability_status": "Content not supplied", "ingestion_status": "Not ingested"})
+    for n, r in unique(RD_FILE, "Source Register", 4, "Source_ID", ["Source", "Purpose"]):
+        location = str(r.get("Location / URL") or "")
+        add(RD_FILE, "Source Register", n, r["Source_ID"], "source_metadata", {
+            "title": r.get("Source"), "source_type": r.get("Purpose"), "owner": r.get("Owner"),
+            "original_reference": location or None, "source_status": r.get("Status"),
+            "last_validated_date": str(r.get("As of")) if r.get("As of") is not None else None,
+            "usage_note": r.get("Usage note"), "availability_status": "Content not supplied",
+            "ingestion_status": "Not ingested"})
     workbook = load_workbook(RD_FILE, read_only=True, data_only=True)
     try:
         ws = workbook["Question Bank & Difficulty"]

@@ -17,10 +17,11 @@ from auth import Actor, current_user, require, mapping_access, employee_access, 
 from event_service import audit, notify
 from governance_service import record_question, scoped_question, latest_revision, edit, review
 from assessment_service import create_assessment, get_assessment, submit_assessment
-from question_service import generate_question_drafts
+from question_service import generate_question_drafts, generate_rd_question_drafts
 from llm_provider import ProviderError
 from excel_loader import validate_workbooks
 from rag_service import retrieve_finance_context
+from offline_rag import load_index, public_source_status, retrieve as retrieve_offline, RagError
 from leader_service import aggregate
 from tni_service import get_employee_tni
 
@@ -301,9 +302,37 @@ def source_status(db: DbSession, actor: Actor):
         missing = sum(issue.get("missing_skill_count", 0) for issue in result["issues"])
     except (OSError, ValueError, KeyError, BadZipFile):
         return {"status": "blocked", "reason": "Required source workbook unavailable", "approved_sop_available": False}
+    local_sources = public_source_status()
+    approved_local = any(source["ingestion_status"] == "Ingested" and not source["synthetic_only"]
+                         for source in local_sources)
     return {"status": "needs_review", "missing_finance_skill_references": missing,
-            "approved_sop_available": False,
-            "reason": "Approved SOP documents are not supplied. Workbook mappings require source validation; linked resources are not approved document content."}
+            "approved_sop_available": approved_local,
+            "local_rag_sources": local_sources,
+            "ingested_source_count": sum(source["ingestion_status"] == "Ingested" for source in local_sources),
+            "reason": ("Approved local source content is ingested; workbook links remain metadata only."
+                       if approved_local else
+                       "Approved SOP documents are not supplied. Workbook mappings require source validation; linked resources are not approved document content.")}
+
+
+@app.get("/rag/sources")
+def rag_sources(db: DbSession, actor: Actor):
+    require(actor, "admin", "ld", "reviewer")
+    return {"sources": public_source_status(), "content_exposed": False}
+
+
+@app.get("/rag/retrieve")
+def rag_retrieve(skill_id: str, intended_proficiency: str, query: str,
+                 db: DbSession, actor: Actor, function: str = "DataOps"):
+    require(actor, "admin", "ld", "reviewer")
+    if actor.role == "reviewer":
+        details = profile(db, actor.id)
+        if not details or details.business_function != "DataOps":
+            raise HTTPException(403, "DataOps source retrieval is outside your scope")
+    try:
+        return retrieve_offline(function=function, skill_id=skill_id,
+                                intended_proficiency=intended_proficiency, query=query)
+    except RagError as error:
+        raise HTTPException(409, str(error)) from None
 
 
 @app.get("/rag/context")
@@ -321,15 +350,33 @@ def rag_context(role_name: str, skill_name: str, db: DbSession, actor: Actor):
 def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
     mapping = mapping_access(db, actor, payload.role_skill_map_id)
-    if db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first():
+    source_mapping = db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first()
+    if source_mapping and source_mapping.workbook == "finance_assessment.xlsx":
         raise HTTPException(409, "Workbook-backed mappings use imported questions only. Mapping unavailable — pending source validation.")
     if not mapping.is_expected or mapping.target_level is None:
         raise HTTPException(400, "Questions cannot be generated for a non-expected skill")
-    if payload.require_approved_sop:
+    if payload.require_approved_sop and (not source_mapping or source_mapping.workbook != "overall_rd.xlsx"):
         raise HTTPException(409, "Approved SOP/training documents are unavailable; use explicitly synthetic mock exercises")
     role, skill = db.get(models.Role, mapping.role_id), db.get(models.Skill, mapping.skill_id)
-    drafts = generate_question_drafts(role.role_name, skill.name, mapping.target_level,
-        mapping.target_label or f"Level {mapping.target_level}", skill.description or "", payload.question_count)
+    provenance = None
+    if source_mapping and source_mapping.workbook == "overall_rd.xlsx":
+        existing = db.query(models.Question).join(models.QuestionScope).filter(
+            models.QuestionScope.role_skill_map_id == mapping.id,
+            models.Question.skill_level == mapping.target_level,
+            models.Question.status == "approved",
+        ).order_by(models.Question.id).limit(payload.question_count).all()
+        if existing:
+            return [question_output(db, question) for question in existing]
+        source_skill = db.query(models.SourceRecord).filter_by(
+            entity_type="skill", entity_id=skill.id, workbook="overall_rd.xlsx").first()
+        if not source_skill:
+            raise HTTPException(409, "No approved source content available for this skill")
+        drafts, provenance = generate_rd_question_drafts(
+            role.role_grade or role.role_name, source_skill.source_key, skill.name, mapping.target_level,
+            mapping.target_label or f"Level {mapping.target_level}", payload.difficulty, payload.question_count)
+    else:
+        drafts = generate_question_drafts(role.role_name, skill.name, mapping.target_level,
+            mapping.target_label or f"Level {mapping.target_level}", skill.description or "", payload.question_count)
     questions = []
     for draft in drafts:
         question = models.Question(skill_id=skill.id, skill_level=mapping.target_level,
@@ -337,6 +384,8 @@ def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, 
         db.add(question)
         db.flush()
         db.add(models.QuestionScope(question_id=question.id, role_skill_map_id=mapping.id))
+        if provenance:
+            db.add(models.QuestionGrounding(question_id=question.id, **provenance))
         record_question(db, question, actor.id, "generated")
         questions.append(question)
     reviewers = db.query(models.User).join(models.UserProfile, models.User.id == models.UserProfile.user_id).filter(
@@ -344,7 +393,18 @@ def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, 
     for reviewer in reviewers:
         notify(db, reviewer.id, "Questions awaiting review", f"{len(questions)} draft questions require review.",
                "questions.generated", mapping.id, actor.id)
-    return questions
+    return [question_output(db, question) for question in questions]
+
+
+def question_output(db, question):
+    data = schemas.QuestionResponse.model_validate(question).model_dump()
+    grounding = db.get(models.QuestionGrounding, question.id)
+    if grounding:
+        for key in ("source_skill_id", "target_proficiency", "difficulty", "question_type",
+                    "source_ids", "chunk_references", "document_references", "ai_confidence",
+                    "provider_name", "provider_model", "synthetic_only"):
+            data[key] = getattr(grounding, key)
+    return data
 
 
 @app.get("/questions", response_model=list[schemas.QuestionResponse])
@@ -356,7 +416,7 @@ def list_questions(db: DbSession, actor: Actor):
         query = query.join(models.QuestionScope).join(models.RoleSkillMap,
             models.QuestionScope.role_skill_map_id == models.RoleSkillMap.id).join(models.Role).filter(
             models.Role.business_function == (details.business_function if details else ""))
-    return query.order_by(models.Question.id.desc()).all()
+    return [question_output(db, question) for question in query.order_by(models.Question.id.desc()).all()]
 
 
 @app.patch("/questions/{question_id}/review", response_model=schemas.QuestionResponse)

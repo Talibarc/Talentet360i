@@ -1,5 +1,7 @@
 # Talent360i skills and development workspace
 
+Phase 5A adds a provider-independent offline RAG foundation for RD/DataOps. `backend/offline_rag.py` ingests only manifest-approved PDF, DOCX, PPTX or text files beneath `RAG_SOURCE_DIR`, writes a Git-ignored deterministic index, and retrieves by exact function, Skill_ID, proficiency, approval and synthetic policy. Workbook URLs remain metadata and are never fetched. Finance keeps its validated workbook behavior.
+
 Phase 4 adds read-only, traceable imports from the supplied Finance and RD/DataOps workbooks to the responsive React/TypeScript and FastAPI application. Stable workbook keys, sheet/row provenance, review status, source limitations and SME policy safeguards are retained. Unsupported records remain blocked rather than being inferred. See [backend/README.md](backend/README.md) for demo identities, role permissions and the full API walkthrough.
 
 ## Install on Windows
