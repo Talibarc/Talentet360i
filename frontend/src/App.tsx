@@ -174,12 +174,13 @@ export default function App() {
                 </div>
               ) : (
                 <Empty>
-                  No synthetic identities found. Run backend/seed_demo.py with
-                  LLM_PROVIDER=mock, then reload.
+                  No seeded demo identities found. Seed them in mock mode, then
+                  enable demo identities for this local environment.
                 </Empty>
               )}
               <div className="source-note">
-                Mock mode · Demo identities · No Luna connection
+                Generation provider: {data.provider} · Local demo identities ·
+                Loopback validation only
               </div>
             </Panel>
           </main>

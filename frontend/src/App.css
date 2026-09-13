@@ -273,6 +273,38 @@
   overflow-x: auto;
   max-width: 100%;
 }
+.skill-picker {
+  width: clamp(280px, 34vw, 520px);
+  max-height: 210px;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.skill-picker legend {
+  padding: 0 5px;
+  color: #61718a;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.skill-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 4px;
+  line-height: 1.35;
+  cursor: pointer;
+  white-space: normal;
+}
+.skill-option + .skill-option {
+  border-top: 1px solid #eef1f5;
+}
+.skill-option span {
+  overflow-wrap: anywhere;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -892,6 +924,9 @@ footer {
   .card-heading {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+  .skill-picker {
+    width: min(520px, 75vw);
   }
   .nav-backdrop {
     position: fixed;

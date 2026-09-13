@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RagBatchUpload } from "./Admin";
@@ -7,7 +7,7 @@ import { ApiError, type Api } from "./api";
 const registry = { sources: [
   { source_id:"SRC_ONE",source_title:"Registered source",source_type:"Training",source_owner:"Test owner",mapped_skill_ids:["RD_A"],availability_status:"Content not supplied" },
   { source_id:"SRC_AMBIG",source_title:"Ambiguous source",source_type:"SOP",source_owner:"Test owner",mapped_skill_ids:["RD_A","RD_B"],availability_status:"Content not supplied" },
-], skill_ids:["RD_A","RD_B"], limits:{maximum_files:20,maximum_file_bytes:1000,maximum_batch_bytes:5000} };
+], skill_ids:["RD_A","RD_B"], skills:[{skill_id:"RD_A",skill_name:"Alpha skill"},{skill_id:"RD_B",skill_name:"Beta skill"}], limits:{maximum_files:20,maximum_file_bytes:1000,maximum_batch_bytes:5000} };
 
 describe("bulk RAG upload", () => {
   it("reviews and ingests multiple files with per-file mappings", async () => {
@@ -29,7 +29,7 @@ describe("bulk RAG upload", () => {
     const files=[new File(["first"],"one.txt",{type:"text/plain"}),new File(["second"],"two.txt",{type:"text/plain"})];
     await user.upload(screen.getByLabelText("Select source documents"),files);
     const sources=screen.getAllByLabelText(/^Source for /); await user.selectOptions(sources[0],"SRC_ONE"); await user.selectOptions(sources[1],"SRC_ONE");
-    const skills=screen.getAllByLabelText(/^Skills for /); await user.selectOptions(skills[0],["RD_A","RD_B"]);
+    const skills=screen.getAllByRole("group",{name:/Skills for /}); await user.click(within(skills[0]).getByLabelText(/RD_B — Beta skill/));
     for (const box of screen.getAllByLabelText(/^Approve /)) await user.click(box);
     await user.click(screen.getByRole("button",{name:"Validate All"})); await waitFor(()=>expect(screen.getAllByText("Ready")).toHaveLength(2));
     await user.click(screen.getByRole("button",{name:"Upload & Ingest All"}));

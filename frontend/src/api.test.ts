@@ -47,6 +47,14 @@ describe("central API client", () => {
       });
     },
   );
+  it("shows a provider-independent disabled-demo message", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response('{"detail":"Demo identities are disabled in this environment."}', { status: 403 }),
+    );
+    await expect(createApi(null)("/demo/identities")).rejects.toMatchObject({
+      message: "Demo identities are disabled in this environment.",
+    });
+  });
   it("formats field validation and network errors", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(

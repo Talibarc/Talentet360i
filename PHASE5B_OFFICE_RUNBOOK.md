@@ -13,7 +13,7 @@ Keep source documents, the manifest, local index, `.env`, credentials, and datab
 9. Resolve rows marked **Mapping required** or **Pending source validation**, remove unwanted rows, then choose **Upload & Ingest All** and review every result.
 10. Verify statuses, hashes and chunk counts in the Admin/L&D source view and `GET /rag/sources`. The manifest CLI remains an optional controlled fallback.
 11. Test exact Skill_ID retrieval with `GET /rag/retrieve`; confirm function/skill isolation.
-12. Configure Luna endpoint, key, model and version only in the local untracked `.env`.
+12. For controlled local validation, configure the untracked `.env` with `LLM_PROVIDER=luna`, `DEMO_IDENTITIES_ENABLED=true`, and `ALLOW_SYNTHETIC_RAG=false`, plus locally supplied Luna values. Bind the backend only to `127.0.0.1`. This combination is for local hackathon validation only and must never be used for production or public hosting.
 13. Run one minimal approved Luna connectivity test.
 14. Generate one Finance draft and verify the existing Finance behavior.
 15. Generate one RD draft; verify citations, `Pending SME Review`, confidence as triage metadata, and `synthetic_only=false`.

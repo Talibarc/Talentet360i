@@ -80,9 +80,9 @@ def me(db: DbSession, actor: Actor):
 
 @app.get("/demo/identities")
 def demo_identities(request: Request, db: DbSession):
-    """Discover explicitly seeded synthetic identities for the local mock UI."""
-    if config.LLM_PROVIDER != "mock":
-        raise HTTPException(403, "Demo selector requires mock mode")
+    """Discover explicitly seeded identities when local demo access is enabled."""
+    if not config.DEMO_IDENTITIES_ENABLED:
+        raise HTTPException(403, "Demo identities are disabled in this environment.")
     if not request.client or request.client.host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
         raise HTTPException(403, "Demo selector is available on loopback only")
     seeded = db.query(models.User).join(models.AuditEvent,
@@ -90,7 +90,7 @@ def demo_identities(request: Request, db: DbSession):
         models.AuditEvent.action == "demo.identity_created",
         models.User.employee_id.like("DEMO-%"),
         models.User.email.like("%@example.invalid")).distinct().all()
-    return {"provider": "mock", "identities": [{"id": u.id, "role": u.role,
+    return {"provider": config.LLM_PROVIDER, "identities": [{"id": u.id, "role": u.role,
         "label": u.employee_id, "business_function": profile(db, u.id).business_function
         if profile(db, u.id) else None} for u in seeded]}
 
@@ -327,7 +327,19 @@ def rag_sources(db: DbSession, actor: Actor):
 def rag_source_registry(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     sources, skills = source_registry()
-    return {"sources": sources, "skill_ids": sorted(skills),
+    skill_rows = db.query(models.SourceRecord).filter_by(
+        workbook="overall_rd.xlsx", entity_type="skill").order_by(models.SourceRecord.source_key).all()
+    skill_catalog = [{"skill_id": row.source_key,
+                      "skill_name": row.details.get("source_name") or row.details.get("name") or row.source_key}
+                     for row in skill_rows]
+    if not skill_catalog:
+        from source_import import source_plan
+        records, _ = source_plan()
+        skill_catalog = [{"skill_id": row["source_key"],
+                          "skill_name": row["details"].get("source_name") or row["details"].get("name")}
+                         for row in records if row["workbook"] == "overall_rd.xlsx"
+                         and row["entity_type"] == "skill"]
+    return {"sources": sources, "skill_ids": sorted(skills), "skills": skill_catalog,
             "limits": {"maximum_files": config.RAG_MAX_BATCH_FILES,
                        "maximum_file_bytes": config.RAG_MAX_FILE_BYTES,
                        "maximum_batch_bytes": config.RAG_MAX_BATCH_BYTES}}

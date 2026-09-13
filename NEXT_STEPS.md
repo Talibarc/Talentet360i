@@ -6,7 +6,9 @@ The offline RAG foundation accepts explicit local manifests and PDF, DOCX, PPTX 
 
 Phase 5A.1 adds Admin/L&D multi-file review, validation and partial-failure ingestion. Each file keeps independent source/skill approval, progress, hash, sanitized storage name and final status; unregistered sources remain pending and cannot ground questions.
 
-Verified in mock mode: backend **116 passed**, frontend **30 passed**, frontend lint passed, and the production build passed. No Luna or external source request was made.
+Verified after the Phase 5B blocker fix: backend **118 passed**, frontend **32 passed**, frontend lint passed, and the production build passed. Luna and external sources were not called.
+
+Phase 5B local access blocker resolved: `LLM_PROVIDER` now controls generation only, while `DEMO_IDENTITIES_ENABLED` independently controls the loopback-only seeded identity selector. The Luna-plus-demo combination is documented for local office validation only.
 
 Phase 4 completed on 2026-09-13 in mock mode. The original Finance and RD workbooks were read without modification, and the SME clarification workbook was validated from its local attachment location without copying it into the repository.
 

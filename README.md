@@ -4,6 +4,8 @@ Phase 5A adds a provider-independent offline RAG foundation for RD/DataOps. `bac
 
 Phase 5A.1 adds an authenticated Admin/L&D bulk upload screen. Multiple files are validated together and ingested independently, with filename sanitization, generated storage names, per-file and batch limits, hash duplicate detection, multi-skill mappings and pending validation for unregistered sources.
 
+`LLM_PROVIDER` selects only the generation provider. `DEMO_IDENTITIES_ENABLED` controls the loopback-only seeded identity selector. When the latter is omitted, mock enables it and Luna disables it. The combination `LLM_PROVIDER=luna` and `DEMO_IDENTITIES_ENABLED=true` is restricted to a backend bound to `127.0.0.1` for local hackathon validation and must never be used for production or public hosting.
+
 Phase 4 adds read-only, traceable imports from the supplied Finance and RD/DataOps workbooks to the responsive React/TypeScript and FastAPI application. Stable workbook keys, sheet/row provenance, review status, source limitations and SME policy safeguards are retained. Unsupported records remain blocked rather than being inferred. See [backend/README.md](backend/README.md) for demo identities, role permissions and the full API walkthrough.
 
 ## Install on Windows

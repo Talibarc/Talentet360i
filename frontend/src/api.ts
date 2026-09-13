@@ -55,7 +55,9 @@ export function createApi(userId: number | null) {
       throw new ApiError(
         response.status,
         [
-          messages[response.status],
+          response.status === 403 && detail.startsWith("Demo identities are disabled")
+            ? ""
+            : messages[response.status],
           detail ||
             (!messages[response.status] ? "Request failed. Please retry." : ""),
         ]

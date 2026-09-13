@@ -55,6 +55,16 @@ const assessment = {
   xp_awarded: 0,
 };
 describe("role workflows", () => {
+  it("allows local demo selection while Luna remains the configured provider", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      provider: "luna",
+      identities: [{ id: 701, role: "employee", label: "Synthetic", business_function: "Finance" }],
+    })));
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "Employee Finance" })).toBeInTheDocument();
+    expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
+    expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
+  });
   it("discovers identities dynamically and hides admin navigation for employees", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);

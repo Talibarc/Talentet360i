@@ -4,6 +4,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 from database import get_db
 import models
+import config
 
 Db = Annotated[Session, Depends(get_db, scope="function")]
 ADMIN_ROLES = {"admin", "ld"}
@@ -13,6 +14,8 @@ def current_user(request: Request, db: Db,
                  x_demo_user_id: Annotated[int | None, Header(gt=0)] = None):
     if request.client and request.client.host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
         raise HTTPException(403, "Demo identity is available on loopback only")
+    if not config.DEMO_IDENTITIES_ENABLED:
+        raise HTTPException(403, "Demo identities are disabled in this environment.")
     if x_demo_user_id is None:
         raise HTTPException(401, "Select a demo identity with X-Demo-User-Id")
     user = db.get(models.User, x_demo_user_id)

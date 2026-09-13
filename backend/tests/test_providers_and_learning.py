@@ -64,7 +64,7 @@ def test_luna_missing_credentials_safe_http_error(client, seeded, monkeypatch):
 def test_dotenv_only_provider_switch(tmp_path):
     # Route the existing dotenv loader to a temporary synthetic config file.
     env = {k: v for k, v in os.environ.items()
-           if not k.startswith(("LUNA_", "CIS_")) and k not in {"LLM_PROVIDER", "PYTHON_DOTENV_DISABLED"}}
+           if not k.startswith(("LUNA_", "CIS_")) and k not in {"LLM_PROVIDER", "DEMO_IDENTITIES_ENABLED", "PYTHON_DOTENV_DISABLED"}}
     path = tmp_path / ".env"
     script = (
         "import dotenv,sys; original=dotenv.load_dotenv; "
@@ -73,7 +73,8 @@ def test_dotenv_only_provider_switch(tmp_path):
         "print(get_provider().name); "
         "assert config.CIS_BASE_URL == 'https://example.invalid'; "
         "assert config.CIS_MODEL == 'synthetic-model'; "
-        "assert config.CIS_API_KEY == 'synthetic-placeholder'"
+        "assert config.CIS_API_KEY == 'synthetic-placeholder'; "
+        "assert config.DEMO_IDENTITIES_ENABLED == (config.LLM_PROVIDER == 'mock')"
     )
     for provider in ("mock", "luna"):
         path.write_text(f"LLM_PROVIDER={provider}\nLUNA_BASE_URL=https://example.invalid\n"
@@ -82,6 +83,21 @@ def test_dotenv_only_provider_switch(tmp_path):
                                 cwd=Path(__file__).resolve().parents[1], env=env,
                                 capture_output=True, text=True, check=True)
         assert result.stdout.strip() == provider
+
+
+def test_dotenv_can_enable_demo_without_changing_luna_provider(tmp_path):
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("LUNA_", "CIS_")) and k not in {"LLM_PROVIDER", "DEMO_IDENTITIES_ENABLED", "PYTHON_DOTENV_DISABLED"}}
+    path = tmp_path / ".env"
+    path.write_text("LLM_PROVIDER=luna\nDEMO_IDENTITIES_ENABLED=true\n", encoding="utf-8")
+    script = ("import dotenv,sys; original=dotenv.load_dotenv; "
+              "dotenv.load_dotenv=lambda _:original(sys.argv[1]); import config; "
+              "from llm_provider import get_provider,LunaProvider; "
+              "assert config.DEMO_IDENTITIES_ENABLED is True; "
+              "assert config.LLM_PROVIDER == 'luna'; assert isinstance(get_provider(),LunaProvider)")
+    subprocess.run([sys.executable, "-B", "-c", script, str(path)],
+                   cwd=Path(__file__).resolve().parents[1], env=env,
+                   capture_output=True, text=True, check=True)
 
 
 def test_mock_without_azure_imports():

@@ -10,6 +10,24 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").strip().lower()
 if LLM_PROVIDER not in {"mock", "luna"}:
     raise ValueError("LLM_PROVIDER must be mock or luna")
 
+
+def _optional_bool(name: str) -> bool | None:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be true or false")
+
+
+_demo_identities_override = _optional_bool("DEMO_IDENTITIES_ENABLED")
+DEMO_IDENTITIES_ENABLED = (
+    LLM_PROVIDER == "mock" if _demo_identities_override is None else _demo_identities_override
+)
+
 # Preserve the existing CIS adapter and legacy environment compatibility.
 # A supplied LUNA value takes precedence over its legacy CIS counterpart.
 CIS_API_KEY = os.getenv("LUNA_API_KEY") or os.getenv("CIS_API_KEY", "")
