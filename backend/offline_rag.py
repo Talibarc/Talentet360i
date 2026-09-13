@@ -254,13 +254,14 @@ def ingest_manifest(
             "ingestion_status": "Ingestion failed",
             "chunk_count": 0,
             "content_hash": None,
+            "version": None,
             "ingested_at": timestamp,
             "limitation": None,
         }
         try:
             path = validate_entry(entry, root, registry, skill_ids)
             file_hash = hashlib.sha256(path.read_bytes()).hexdigest()
-            base.update(availability_status="Available locally", content_hash=file_hash)
+            base.update(availability_status="Available locally", content_hash=file_hash, version=file_hash[:12])
             if file_hash in hashes:
                 raise RagError(f"Duplicate content matches source {hashes[file_hash]}")
             segments = extract_document(path)
@@ -273,6 +274,7 @@ def ingest_manifest(
                     skill_ids=entry.skill_ids,
                     document_filename=entry.filename,
                     file_content_hash=file_hash,
+                    version=file_hash[:12],
                     synthetic_only=entry.synthetic_only,
                     function="DataOps",
                     role_bands=entry.role_bands,
@@ -365,7 +367,8 @@ def public_source_status(index: dict[str, Any] | None = None) -> list[dict[str, 
         result.append({key: source.get(key) for key in (
             "source_id", "title", "skill_ids", "source_type", "owner", "original_reference",
             "role_bands", "intended_proficiencies", "availability_status", "ingestion_status",
-            "chunk_count", "content_hash", "last_validated_date", "synthetic_only", "limitation",
+            "chunk_count", "content_hash", "version", "original_filename", "internal_storage_name",
+            "last_validated_date", "synthetic_only", "limitation",
         )})
     return result
 

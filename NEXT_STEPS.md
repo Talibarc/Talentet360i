@@ -4,6 +4,10 @@
 
 The offline RAG foundation accepts explicit local manifests and PDF, DOCX, PPTX or text documents without URL access. It validates stable RD source/skill metadata, rejects path traversal and unsafe synthetic use, records hashes and provenance, performs deterministic skill-scoped retrieval, and fails closed without approved context. Generated RD drafts remain pending SME review. Approved company content, Luna connectivity and live source validation remain Phase 5B office work.
 
+Phase 5A.1 adds Admin/L&D multi-file review, validation and partial-failure ingestion. Each file keeps independent source/skill approval, progress, hash, sanitized storage name and final status; unregistered sources remain pending and cannot ground questions.
+
+Verified in mock mode: backend **116 passed**, frontend **28 passed**, frontend lint passed, and the production build passed. No Luna or external source request was made.
+
 Phase 4 completed on 2026-09-13 in mock mode. The original Finance and RD workbooks were read without modification, and the SME clarification workbook was validated from its local attachment location without copying it into the repository.
 
 The final SME-alignment audit corrected the Faiza reference to the permanent MVP status `Unavailable — excluded from MVP`, audit reference only, 0 imported records. No scoring or source rule was inferred from unresolved SME comments.

@@ -27,4 +27,6 @@ RAG_SOURCE_DIR = Path(os.getenv("RAG_SOURCE_DIR", ENV_FILE.parent / "tests" / "f
 RAG_INDEX_DIR = Path(os.getenv("RAG_INDEX_DIR", ENV_FILE.parent / ".rag_index"))
 ALLOW_SYNTHETIC_RAG = os.getenv("ALLOW_SYNTHETIC_RAG", "false").strip().lower() in {"1", "true", "yes"}
 RAG_MAX_FILE_BYTES = int(os.getenv("RAG_MAX_FILE_BYTES", str(25 * 1024 * 1024)))
+RAG_MAX_BATCH_FILES = int(os.getenv("RAG_MAX_BATCH_FILES", "20"))
+RAG_MAX_BATCH_BYTES = int(os.getenv("RAG_MAX_BATCH_BYTES", str(100 * 1024 * 1024)))
 

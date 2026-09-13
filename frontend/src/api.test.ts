@@ -27,6 +27,14 @@ describe("central API client", () => {
     await createApi(null)("/demo/identities");
     expect(fetcher.mock.calls[0][1]?.headers).toEqual({});
   });
+  it("sends multipart batches without overriding the browser content type", async () => {
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    const form = new FormData(); form.append("metadata", "[]");
+    await createApi(418)("/rag/batch/upload", "POST", form);
+    const options = fetcher.mock.calls[0][1];
+    expect(options?.body).toBe(form);
+    expect(options?.headers).toEqual({ "x-demo-user-id": "418" });
+  });
   it.each([401, 403, 404, 409, 422])(
     "handles status %s with actionable detail",
     async (status) => {

@@ -21,14 +21,15 @@ export function createApi(userId: number | null) {
   ): Promise<T> {
     let response: Response;
     try {
+      const multipart = body instanceof FormData;
       response = await fetch(`/api${path}`, {
         method,
         signal,
         headers: {
           ...(userId ? { "x-demo-user-id": String(userId) } : {}),
-          ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+          ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
         },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError")

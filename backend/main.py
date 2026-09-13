@@ -1,6 +1,7 @@
+import json
 from typing import Annotated
 from zipfile import BadZipFile
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import update, or_
@@ -22,6 +23,8 @@ from llm_provider import ProviderError
 from excel_loader import validate_workbooks
 from rag_service import retrieve_finance_context
 from offline_rag import load_index, public_source_status, retrieve as retrieve_offline, RagError
+from rag_batch import (BatchMapping, BatchValidationRequest, source_registry,
+                       upload_and_ingest, validate_batch)
 from leader_service import aggregate
 from tni_service import get_employee_tni
 
@@ -318,6 +321,43 @@ def source_status(db: DbSession, actor: Actor):
 def rag_sources(db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
     return {"sources": public_source_status(), "content_exposed": False}
+
+
+@app.get("/rag/source-registry")
+def rag_source_registry(db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    sources, skills = source_registry()
+    return {"sources": sources, "skill_ids": sorted(skills),
+            "limits": {"maximum_files": config.RAG_MAX_BATCH_FILES,
+                       "maximum_file_bytes": config.RAG_MAX_FILE_BYTES,
+                       "maximum_batch_bytes": config.RAG_MAX_BATCH_BYTES}}
+
+
+@app.post("/rag/batch/validate")
+def rag_batch_validate(payload: BatchValidationRequest, db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    return validate_batch(payload.files)
+
+
+@app.post("/rag/batch/upload")
+async def rag_batch_upload(db: DbSession, actor: Actor, files: list[UploadFile] = File(...),
+                           metadata: str = Form(...)):
+    require(actor, "admin", "ld")
+    try:
+        raw = json.loads(metadata)
+        mappings = [BatchMapping.model_validate(item) for item in raw]
+        result = await upload_and_ingest(files, mappings)
+    except (json.JSONDecodeError, ValueError, RagError):
+        raise HTTPException(422, "Invalid batch metadata") from None
+    audit(db, actor.id, "rag.batch_ingested", "rag_batch", None,
+          details={key: result[key] for key in ("selected_count", "successfully_ingested",
+                                                "duplicates_skipped", "pending_validation", "failed")})
+    for item in result["files"]:
+        audit(db, actor.id, "rag.file_ingestion_completed", "source_document", None,
+              details={key: item.get(key) for key in ("original_filename", "source_id", "skill_ids",
+                                                       "validation_status", "content_hash", "version",
+                                                       "internal_storage_name", "chunk_count")})
+    return result
 
 
 @app.get("/rag/retrieve")

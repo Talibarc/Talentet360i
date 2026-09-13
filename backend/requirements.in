@@ -8,5 +8,6 @@ openpyxl
 pypdf
 python-docx
 python-pptx
+python-multipart
 azure-ai-inference
 azure-core
