@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RagBatchUpload } from "./Admin";
-import type { Api } from "./api";
+import { ApiError, type Api } from "./api";
 
 const registry = { sources: [
   { source_id:"SRC_ONE",source_title:"Registered source",source_type:"Training",source_owner:"Test owner",mapped_skill_ids:["RD_A"],availability_status:"Content not supplied" },
@@ -42,5 +42,31 @@ describe("bulk RAG upload", () => {
     await user.upload(screen.getByLabelText("Select source documents"),new File(["x"],"ambiguous.txt"));
     await user.selectOptions(screen.getByLabelText("Source for ambiguous.txt"),"SRC_AMBIG");
     expect(screen.getByText("Mapping required")).toBeInTheDocument();
+  });
+
+  it("keeps successful rows visible beside failed, duplicate and pending rows", async () => {
+    const statuses=["Ingested","Failed","Duplicate skipped","Pending source validation"];
+    const api=vi.fn(async (path:string,_method?:string,body?:unknown)=>{
+      if(path==="/rag/source-registry") return registry;
+      const metadata=JSON.parse((body as FormData).get("metadata") as string);
+      return {selected_count:4,successfully_ingested:1,duplicates_skipped:1,pending_validation:1,failed:1,
+        files:metadata.map((file:{client_id:string},index:number)=>({...file,validation_status:statuses[index]}))};
+    }) as unknown as Api;
+    render(<RagBatchUpload api={api}/>); const user=userEvent.setup(); await waitFor(()=>screen.getByText(/Limits: 20 files/));
+    await user.upload(screen.getByLabelText("Select source documents"),["a","b","c","d"].map((name)=>new File([name],`${name}.txt`)));
+    for(const select of screen.getAllByLabelText(/^Source for /)) await user.selectOptions(select,"SRC_ONE");
+    for(const box of screen.getAllByLabelText(/^Approve /)) await user.click(box);
+    await user.click(screen.getByRole("button",{name:"Upload & Ingest All"}));
+    await waitFor(()=>expect(screen.getByText(/Ingested 1.*Duplicates 1.*Pending 1.*Failed 1/)).toBeInTheDocument());
+    for(const status of statuses) expect(screen.getAllByText(status).length).toBeGreaterThan(0);
+  });
+
+  it("shows authorization failures and allows removal before upload", async () => {
+    const api=vi.fn(async (path:string)=>{ if(path==="/rag/source-registry") return registry; throw new ApiError(403,"Your role does not have access to this action."); }) as unknown as Api;
+    render(<RagBatchUpload api={api}/>); const user=userEvent.setup(); await waitFor(()=>screen.getByText(/Limits: 20 files/));
+    await user.upload(screen.getByLabelText("Select source documents"),[new File(["a"],"a.txt"),new File(["b"],"b.txt")]);
+    await user.click(screen.getAllByRole("button",{name:"Remove"})[0]); expect(screen.queryByText("a.txt")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button",{name:"Validate All"}));
+    await waitFor(()=>expect(screen.getByText(/does not have access/)).toBeInTheDocument());
   });
 });
