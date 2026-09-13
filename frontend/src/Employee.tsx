@@ -379,7 +379,7 @@ export default function Employee({
                 ) : (
                   <Empty>
                     No assessment assigned yet. Your manager or L&D can assign
-                    approved questions. {user.business_function === "DataOps" && "DataOps assessment questions are pending an approved source. Mapping unavailable — pending source validation."}
+                    approved questions. {user.business_function === "DataOps" && "The Faiza question source is Unavailable — excluded from MVP. Imported records: 0."}
                   </Empty>
                 )
               }

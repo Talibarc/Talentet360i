@@ -57,6 +57,14 @@ def test_authoritative_inventory_and_frameworks(originals):
     assert sum(r["target_level"] is None and not r["is_expected"] for r in rd) == 28
     assert {r["target_label"]: r["target_level"] for r in rd} == {
         "Beginner": 1, "Moderate": 2, "Expert": 3, "Not Expected": None}
+    question_source = next(r["details"] for r in rows if r["entity_type"] == "question_source")
+    assert "Faiza" in question_source["title"]
+    assert question_source["url"]
+    assert question_source["use_rule"]
+    assert question_source["availability_status"] == "Unavailable — excluded from MVP"
+    assert question_source["audit_reference_only"] is True
+    assert question_source["questions_imported"] == 0
+    assert any("audit reference only" in item for item in report["limitations"])
     missing = {i["key"] for i in report["issues"] if i["reason"] == "Missing skill reference"}
     assert len(missing) == 13
     assert Counter(r["details"]["status"] for r in rows if r["entity_type"] == "question") == {

@@ -63,7 +63,7 @@ export default function Reviewer({
               ) && (
                 <Empty>
                   {businessFunction === "DataOps"
-                    ? "No approved DataOps question rows are available. The referenced external source is unavailable in Phase 4."
+                    ? "No approved DataOps question rows are available. Faiza source status: Unavailable — excluded from MVP. Imported records: 0."
                     : "No questions in this queue. Generate drafts from the Admin workspace."}
                 </Empty>
               )}

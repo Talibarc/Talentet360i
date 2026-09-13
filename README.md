@@ -111,8 +111,8 @@ Loading skeletons, empty states, inline errors, success messages, native accessi
 ### Verified Phase 4 checks
 
 - Backend: **101 passed**, including every Phase 3 regression, 0 failures/errors; 4 warnings from upstream libraries/workbook extensions.
-- Frontend: **24 passed**, 0 failures; lint and production build exit 0.
-- Import: fresh database **382 source records**; repeat import **0 changes**. Finance imports 28 skills, 9 selected roles, 12 role-description records, 60 mappings, 49 safe questions and 30 learning mappings. RD imports 38 skills, 3 bands, 114 matrix mappings, 38 learning metadata records and one unavailable external question-source reference.
+- Frontend: **25 passed**, 0 failures; lint and production build exit 0.
+- Import: fresh database **382 source records**; repeat import **0 changes**. Finance imports 28 skills, 9 selected roles, 12 role-description records, 60 mappings, 49 safe questions and 30 learning mappings. RD imports 38 skills, 3 bands, 114 matrix mappings and 38 learning metadata records. The Faiza question source is retained as an audit reference with status `Unavailable — excluded from MVP` and 0 imported records.
 - Browser: Finance and DataOps Employee, Reviewer, Manager and Leader views plus Admin/L&D were verified against the fresh workbook database. Empty/source-limitation states and confirmed-only reporting render correctly.
 - Original Luna transport/config/provider behavior and both authoritative workbooks are preserved. The SME clarification workbook remains outside Git. No Luna key was requested and no live Luna call was made.
 

@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TniView } from "./Employee";
+import Reviewer from "./Reviewer";
 import { mappingName } from "./catalog";
 import type { Api } from "./api";
 
@@ -28,4 +29,11 @@ it("keeps a workbook result without policy pending and withholds a recommendatio
 it("does not invent a missing catalog mapping", () => {
   expect(mappingName({roles: [], skills: [], mappings: [], users: []}, 123))
     .toBe("Mapping unavailable — pending source validation.");
+});
+
+it("shows the permanent DataOps question-source limitation", async () => {
+  const api = vi.fn().mockResolvedValue([]) as unknown as Api;
+  render(<Reviewer api={api} refresh={vi.fn()} businessFunction="DataOps" />);
+  expect(await screen.findByText(/Unavailable — excluded from MVP/)).toBeInTheDocument();
+  expect(screen.getByText(/Imported records: 0/)).toBeInTheDocument();
 });

@@ -224,8 +224,8 @@ def source_plan():
         workbook.close()
     add(RD_FILE, "Question Bank & Difficulty", 5, "Faiza Question Bank - All Items", "question_source", {
         "title": metadata.get("Authoritative source"), "url": metadata.get("Live URL"),
-        "use_rule": metadata.get("Use rule"), "availability_status": "external_access_unavailable_phase4",
-        "questions_imported": 0})
+        "use_rule": metadata.get("Use rule"), "availability_status": "Unavailable — excluded from MVP",
+        "audit_reference_only": True, "questions_imported": 0})
     for book in (FINANCE_FILE.name, RD_FILE.name):
         report["counts"][book] = dict(Counter(r["entity_type"] for r in records if r["workbook"] == book))
     report["roles"] = [{"workbook": r["workbook"], "key": r["source_key"], **r["details"]}
@@ -248,13 +248,17 @@ def source_plan():
     report["duplicate_skill_names"] = {name: count for name, count in names.items() if count > 1}
     report["missing_finance_skill_ids"] = sorted({i["key"] for i in report["issues"]
         if i["workbook"] == FINANCE_FILE.name and i["reason"] == "Missing skill reference"})
-    report["limitations"] = ["DataOps assessment questions pending an approved source: workbook contains an external list reference only.",
+    report["limitations"] = ["Faiza Microsoft List: Unavailable — excluded from MVP; retained as an audit reference only; imported records: 0.",
         "Score-to-proficiency policy unavailable in both workbooks. Synthetic example results are not a scoring policy.",
         "Learning links and Finance prototype mappings are not proof of approved SOP content or course suitability.",
         "Starting size is 20 with 6 Difficult, 8 Moderate and 6 Easy questions, but no Finance role has 20 approved questions and source difficulty uses Role Ready/Advanced.",
         "Twenty questions cannot cover every required B3/B4 skill; the approved allocation rule is unresolved.",
         "Reassessment requires at least 70% new questions, but the approved source pool is insufficient.",
-        "The more-than-90-percent document-match comments do not define a semantic, rubric or exact match method."]
+        "Criticality versus difficulty is not formally defined; no automatic equivalence is applied.",
+        "No approved AI-confidence scale or threshold is supplied; confidence is review triage only.",
+        "The subjective-scoring repository and MyAcademy document content are not supplied.",
+        "The more-than-90-percent document-match comments do not define a semantic, rubric or exact match method.",
+        "The combined Beginner/Moderate/Expert formula is incomplete, including the Moderate level and how objective, behavioural and evidence results combine."]
     report["assessment_rules"] = {"starting_question_count": 20,
         "difficulty_distribution": {"Difficult": 6, "Moderate": 8, "Easy": 6},
         "critical_incorrect_action": "insight_and_review_only", "minimum_reassessment_new_percent": 70,
