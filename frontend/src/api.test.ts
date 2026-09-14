@@ -35,7 +35,7 @@ describe("central API client", () => {
     expect(options?.body).toBe(form);
     expect(options?.headers).toEqual({ "x-demo-user-id": "418" });
   });
-  it.each([401, 403, 404, 409, 422])(
+  it.each([401, 403, 404, 409, 422, 502, 503])(
     "handles status %s with actionable detail",
     async (status) => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(

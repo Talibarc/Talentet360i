@@ -39,7 +39,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http
 
 @app.exception_handler(ProviderError)
 async def provider_error_handler(request, error):
-    return JSONResponse(status_code=503, content={"detail": str(error)})
+    return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
 
 
 @app.exception_handler(IntegrityError)

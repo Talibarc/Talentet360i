@@ -2,6 +2,8 @@ from azure.ai.inference import ChatCompletionsClient
 from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
  
+from luna_contract import invalid, structural_log
+
 from config import CIS_API_KEY, CIS_API_VERSION, CIS_BASE_URL, CIS_MODEL
  
  
@@ -38,6 +40,19 @@ def generate_text(system_prompt: str, user_prompt: str) -> str:
             model=CIS_MODEL,
             headers={"Authorization": authorization},
         )
-        return response.choices[0].message.content or ""
+        choices = getattr(response, "choices", None)
+        structural_log("response_received", {"choices": choices},
+                       choice_count=len(choices) if isinstance(choices, list) else None)
+        if not isinstance(choices, list) or len(choices) != 1:
+            invalid(None, "expected_one_choice")
+        choice = choices[0]
+        message = getattr(choice, "message", None)
+        content = getattr(message, "content", None)
+        if (getattr(choice, "finish_reason", None) not in (None, "stop")
+                or getattr(message, "role", None) not in (None, "assistant")
+                or getattr(message, "tool_calls", None) or getattr(message, "refusal", None)
+                or not isinstance(content, str)):
+            invalid(None, "expected_completed_text_message")
+        return content
     finally:
         client.close()

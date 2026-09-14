@@ -35,7 +35,7 @@ def test_luna_calls_preserved_adapter(monkeypatch):
         return json.dumps([question])
     monkeypatch.setattr(llm_service, "generate_text", fake_generate)
     assert isinstance(get_provider(), LunaProvider)
-    assert get_provider().questions(**QUESTION_ARGS)[0].rag_source == "Finance Excel RAG"
+    assert get_provider().questions(**QUESTION_ARGS)[0].rag_source == question["rag_source"]
     assert calls == [("Synthetic", "Synthetic")]
     detail = TniNarrative(summary="Synthetic", development_focus="Review", next_steps=["Review"],
                           recommended_resource_ids=[], limitations=["Synthetic fixture"])
@@ -49,7 +49,7 @@ def test_luna_invalid_output_is_safe(monkeypatch, response):
     monkeypatch.setattr(config, "CIS_BASE_URL", "https://example.invalid")
     monkeypatch.setattr(config, "CIS_API_KEY", "synthetic-placeholder")
     monkeypatch.setattr("llm_service.generate_text", lambda *args: response)
-    with pytest.raises(ProviderError, match="invalid question data"):
+    with pytest.raises(ProviderError, match="invalid question data|non-JSON or unparseable"):
         LunaProvider().questions(**QUESTION_ARGS)
 
 

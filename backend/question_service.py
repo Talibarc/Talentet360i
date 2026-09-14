@@ -11,6 +11,11 @@ Use only the supplied source context.
 Return only valid JSON without markdown or extra text.
 Each question must have exactly four options: A, B, C and D.
 Only one option can be correct.
+Return a JSON array with exactly the requested number of objects, using only these fields:
+{"question_text":"A complete question", "options":{"A":"First option", "B":"Second option", "C":"Third option", "D":"Fourth option"}, "correct_answer":"A", "explanation":"Source-supported rationale"}
+Use the exact field names. All text must be nonempty; all four options must be distinct.
+correct_answer must be one option key (A, B, C or D), never the answer text.
+Source IDs, citations, skill IDs and document versions are retained by the application from retrieved context. Do not invent them.
 """
  
  
@@ -90,7 +95,7 @@ def generate_rd_question_drafts(
     except RagError as error:
         raise ProviderError(str(error)) from None
     context = "\n\n".join(
-        f"[{chunk['chunk_id']} | {chunk['source_id']} | {chunk['reference']}] {chunk['text']}"
+        f"[{chunk['chunk_id']} | {chunk['source_id']} | {chunk['reference']} | version {chunk.get('version', 'unavailable')}] {chunk['text']}"
         for chunk in grounding["selected_chunks"]
     )
     user_prompt = f"""

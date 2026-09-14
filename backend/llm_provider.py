@@ -1,14 +1,10 @@
 """Provider selection. Mock never imports the Azure adapter or retrieves company data."""
 
-import json
 from typing import Protocol
 
 import config
 from schemas import GeneratedQuestion, TniNarrative
-
-
-class ProviderError(RuntimeError):
-    """Safe client-facing error, with no credentials or remote response contents."""
+from luna_contract import ProviderError, ResponseContractError, parse_questions, structural_log
 
 
 class LlmProvider(Protocol):
@@ -102,27 +98,24 @@ class LunaProvider:
 
     def _generate(self, system_prompt: str, user_prompt: str) -> str:
         if not config.CIS_BASE_URL or not config.CIS_API_KEY or not config.CIS_MODEL:
+            structural_log("configuration_unavailable")
             raise ProviderError("Configure the Luna endpoint, key, and model on the company laptop")
         # Keep the original transport/authentication implementation intact.
         from llm_service import generate_text
         try:
             return generate_text(system_prompt, user_prompt)
-        except Exception:
+        except ResponseContractError:
+            raise
+        except Exception as error:
+            status = getattr(error, "status_code", None)
+            structural_log("request_unavailable", http_status=status if type(status) is int and 100 <= status <= 599 else None)
             raise ProviderError("Luna request failed; check company-laptop configuration") from None
 
     def questions(self, *, system_prompt: str, user_prompt: str, skill_name: str,
                   target_level: int, question_count: int,
                   grounding: dict | None = None) -> list[GeneratedQuestion]:
         raw = self._generate(system_prompt, user_prompt)
-        try:
-            # Preserve support for the existing adapter's wrapped JSON responses.
-            data = json.loads(raw[raw.index("["):raw.rindex("]") + 1])
-            if not isinstance(data, list) or len(data) != question_count:
-                raise ValueError("Wrong question count")
-            return [GeneratedQuestion.model_validate({**item, "rag_source": "Finance Excel RAG"})
-                    for item in data]
-        except (ValueError, TypeError):
-            raise ProviderError("Luna returned invalid question data") from None
+        return parse_questions(raw, question_count)
 
     def tni(self, facts: dict, resources: list[dict]) -> TniNarrative:
         # Backward-compatible local helper; Luna is never invoked for TNI.
