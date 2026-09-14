@@ -116,8 +116,10 @@ export default function Intelligence({
                 <div className="form-grid">
                   {[
                     "function",
+                    "role_id",
                     "team",
                     "hub",
+                    "skill_id",
                     "readiness",
                   ].map((key) => (
                     <Field key={key} label={key.replaceAll("_", " ")}>
@@ -158,7 +160,7 @@ export default function Intelligence({
                       {data.groups
                         .filter(
                           (g) =>
-                            `${g.skill_name} ${g.function} ${g.team} ${g.hub}`
+                            `${g.skill_id} ${g.skill_name} ${g.role_id}`
                               .toLowerCase()
                               .includes(search.toLowerCase()) &&
                             Object.entries(filter).every(
@@ -169,9 +171,9 @@ export default function Intelligence({
                         .map((g, i) => (
                           <tr key={i}>
                             <td>
-                              {g.skill_name}
+                              {g.skill_id} — {g.skill_name}
                               <small>
-                                {g.function} · {g.team} · {g.hub}
+                                {g.role_id} · {g.function} · {g.team} · {g.hub}
                               </small>
                             </td>
                             <td>{g.current_level ?? "Not confirmed"}</td>
@@ -196,7 +198,7 @@ export default function Intelligence({
               <div className="intelligence-grid">
                 {data.records
                   .filter((r) =>
-                    `${r.employee_name} ${r.role_name} ${r.skill_name}`
+                    `${r.employee_name} ${r.role_name} ${r.skill_id} ${r.skill_name}`
                       .toLowerCase()
                       .includes(search.toLowerCase()),
                   )
@@ -207,6 +209,7 @@ export default function Intelligence({
                     >
                       <div className="row">
                         <h3>
+                          {r.skill_id ? `${r.skill_id} — ` : ""}
                           {r.skill_name}
                         </h3>
                         <Chip>{r.readiness}</Chip>
@@ -240,7 +243,7 @@ export default function Intelligence({
                         r.recommendations.map((c) => (
                           <div className="inset" key={c.course_id}>
                             <strong>
-                              {c.title}
+                              {c.course_id} — {c.title}
                             </strong>
                             <p>{c.reason}</p>
                             {c.provenance.map((p) => (
@@ -309,7 +312,6 @@ export default function Intelligence({
 export function MappingCoverage({ api }: { api: Api }) {
   const state = useResource<{
     mappings: {
-      role_name?: string;
       role_id: string;
       skill_id: string;
       skill_name: string;
@@ -358,9 +360,9 @@ export function MappingCoverage({ api }: { api: Api }) {
                     .map((r, i) => (
                       <tr key={i}>
                         <td>
-                          {r.role_name ?? "Role unavailable"}
+                          {r.role_id}
                           <small>
-                            {r.skill_name}
+                            {r.skill_id} — {r.skill_name}
                           </small>
                         </td>
                         <td>{r.target}</td>
@@ -370,7 +372,7 @@ export function MappingCoverage({ api }: { api: Api }) {
                           {r.resources.map((c) => (
                             <details key={c.resource_id}>
                               <summary>
-                                {c.title}
+                                {c.resource_id} — {c.title}
                               </summary>
                               {c.provenance.workbook} / {c.provenance.sheet} /
                               row {c.provenance.row}
@@ -390,7 +392,7 @@ export function MappingCoverage({ api }: { api: Api }) {
             </div>
           ) : (
             <Empty>
-              Use Setup and settings on Create Questions to check your function’s mappings.
+              Import workbook mappings from L&D Overview to review coverage.
             </Empty>
           )
         }

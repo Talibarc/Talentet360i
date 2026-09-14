@@ -27,7 +27,6 @@ from rag_batch import (BatchMapping, BatchValidationRequest, source_registry,
                        upload_and_ingest, validate_batch)
 from leader_service import aggregate
 from tni_service import get_employee_tni
-from function_scope import function_scope, check_function, workbook_for, scoped_report, visible_event, ensure_function_demo_ld
 
 # Additive tables only: the seven Phase 1 tables retain their original columns.
 Base.metadata.create_all(bind=engine)
@@ -91,15 +90,6 @@ def demo_identities(request: Request, db: DbSession):
         models.AuditEvent.action == "demo.identity_created",
         models.User.employee_id.like("DEMO-%"),
         models.User.email.like("%@example.invalid")).distinct().all()
-    if seeded:
-        ensure_function_demo_ld(db)
-        seeded = db.query(models.User).join(
-            models.UserProfile, models.UserProfile.user_id == models.User.id
-        ).join(models.AuditEvent,
-            models.AuditEvent.subject_id == models.User.id).filter(
-            models.AuditEvent.action == "demo.identity_created", models.User.employee_id.like("DEMO-%"),
-            models.User.email.like("%@example.invalid"), models.User.role != "admin",
-            models.UserProfile.business_function.in_(["Finance", "DataOps"])).distinct().all()
     return {"provider": config.LLM_PROVIDER, "identities": [{"id": u.id, "role": u.role,
         "label": u.employee_id, "business_function": profile(db, u.id).business_function
         if profile(db, u.id) else None} for u in seeded]}
@@ -126,9 +116,6 @@ def create_user(payload: schemas.UserCreate, db: DbSession, actor: Actor):
             raise HTTPException(400, "Manager/function mismatch")
     if payload.role in {"leader", "reviewer", "manager"} and not details["business_function"]:
         raise HTTPException(400, "Configure a business function for this role")
-    check_function(db, actor, details["business_function"])
-    if function_scope(db, actor) and payload.role == "admin":
-        raise HTTPException(403, "Only an internal administrator can create administrators")
     user = models.User(**data)
     db.add(user)
     db.flush()
@@ -146,10 +133,6 @@ def list_users(db: DbSession, actor: Actor):
                 or_(models.User.id == actor.id, models.UserProfile.manager_id == actor.id))
         else:
             query = query.filter(models.User.id == actor.id)
-    if actor.role == "ld" and function_scope(db, actor):
-        query = query.join(
-            models.UserProfile, models.UserProfile.user_id == models.User.id
-        ).filter(models.UserProfile.business_function == function_scope(db, actor))
     return [user_response(db, user) for user in query.order_by(models.User.id)]
 
 
@@ -159,7 +142,6 @@ def update_profile(user_id: int, payload: ws.ProfileUpdate, db: DbSession, actor
     user = db.get(models.User, user_id)
     if not user:
         raise HTTPException(404, "User not found")
-    employee_access(db, actor, user_id)
     details = profile(db, user_id)
     data = {key: getattr(details, key) if details else None for key in PROFILE_FIELDS}
     data.update(payload.model_dump(exclude_unset=True))
@@ -178,7 +160,6 @@ def update_profile(user_id: int, payload: ws.ProfileUpdate, db: DbSession, actor
             raise HTTPException(400, "Assigned manager/function is invalid")
     if user.role in {"leader", "reviewer", "manager"} and not data["business_function"]:
         raise HTTPException(400, "This role requires a business function")
-    check_function(db, actor, data["business_function"])
     if details is None:
         details = models.UserProfile(user_id=user_id)
         db.add(details)
@@ -191,7 +172,6 @@ def update_profile(user_id: int, payload: ws.ProfileUpdate, db: DbSession, actor
 @app.post("/roles", response_model=schemas.RoleResponse, status_code=201)
 def create_role(payload: schemas.RoleCreate, db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    check_function(db, actor, payload.business_function)
     role = models.Role(**payload.model_dump())
     db.add(role)
     db.flush()
@@ -202,7 +182,7 @@ def create_role(payload: schemas.RoleCreate, db: DbSession, actor: Actor):
 @app.get("/roles", response_model=list[schemas.RoleResponse])
 def list_roles(db: DbSession, actor: Actor):
     query = db.query(models.Role)
-    if actor.role not in {"admin", "ld"} or (actor.role == "ld" and function_scope(db, actor)):
+    if actor.role not in {"admin", "ld"}:
         details = profile(db, actor.id)
         query = query.filter(models.Role.business_function == (details.business_function if details else ""))
     if config.LLM_PROVIDER == "luna":
@@ -213,8 +193,6 @@ def list_roles(db: DbSession, actor: Actor):
 @app.post("/skills", response_model=schemas.SkillResponse, status_code=201)
 def create_skill(payload: schemas.SkillCreate, db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    if function_scope(db, actor):
-        raise HTTPException(403, "Skill creation requires internal source administration")
     skill = models.Skill(**payload.model_dump())
     db.add(skill)
     db.flush()
@@ -225,7 +203,7 @@ def create_skill(payload: schemas.SkillCreate, db: DbSession, actor: Actor):
 @app.get("/skills", response_model=list[schemas.SkillResponse])
 def list_skills(db: DbSession, actor: Actor):
     query = db.query(models.Skill)
-    if actor.role not in {"admin", "ld"} or (actor.role == "ld" and function_scope(db, actor)):
+    if actor.role not in {"admin", "ld"}:
         details = profile(db, actor.id)
         query = query.join(models.RoleSkillMap).join(models.Role).filter(
             models.Role.business_function == (details.business_function if details else ""))
@@ -249,11 +227,6 @@ def create_mapping(payload: schemas.RoleSkillMapCreate, db: DbSession, actor: Ac
     skill = db.get(models.Skill, payload.skill_id)
     if not db.get(models.Role, payload.role_id) or not skill:
         raise HTTPException(404, "Role or skill not found")
-    check_function(db, actor, db.get(models.Role, payload.role_id).business_function)
-    if function_scope(db, actor):
-        linked = db.query(models.Role).join(models.RoleSkillMap).filter(models.RoleSkillMap.skill_id == skill.id).all()
-        if linked and not any(r.business_function == function_scope(db, actor) for r in linked):
-            raise HTTPException(403, "Skill is outside your function")
     if payload.target_level is not None and payload.target_level > skill.max_level:
         raise HTTPException(400, "Target level exceeds the supplied skill framework")
     if db.query(models.RoleSkillMap).filter_by(role_id=payload.role_id, skill_id=payload.skill_id).first():
@@ -268,7 +241,7 @@ def create_mapping(payload: schemas.RoleSkillMapCreate, db: DbSession, actor: Ac
 @app.get("/role-skill-maps", response_model=list[schemas.RoleSkillMapResponse])
 def list_mappings(db: DbSession, actor: Actor):
     query = db.query(models.RoleSkillMap)
-    if actor.role not in {"admin", "ld"} or (actor.role == "ld" and function_scope(db, actor)):
+    if actor.role not in {"admin", "ld"}:
         details = profile(db, actor.id)
         query = query.join(models.Role).filter(models.Role.business_function == (details.business_function if details else ""))
         if actor.role == "employee":
@@ -294,9 +267,6 @@ def configure_policy(mapping_id: int, payload: ws.PolicyCreate, db: DbSession, a
 def validate_source_data(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     try:
-        if workbook_for(db, actor):
-            from source_import import source_plan
-            return scoped_report(source_plan()[1], workbook_for(db, actor))
         return validate_workbooks()
     except (OSError, ValueError, KeyError, BadZipFile):
         return {"status": "blocked", "issues": [{"issue": "Required workbook or sheet unavailable"}]}
@@ -307,7 +277,7 @@ def source_inventory(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     from source_import import source_plan
     try:
-        return scoped_report(source_plan()[1], workbook_for(db, actor))
+        return source_plan()[1]
     except (OSError, ValueError, KeyError, BadZipFile):
         raise HTTPException(409, "Required source workbook or schema unavailable. Restore the approved workbook and retry.") from None
 
@@ -317,7 +287,7 @@ def import_source_data(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     from source_import import import_sources
     try:
-        return import_sources(db, actor.id, workbook=workbook_for(db, actor))
+        return import_sources(db, actor.id)
     except (OSError, ValueError, KeyError, BadZipFile):
         raise HTTPException(409, "Required source workbook or schema unavailable. Restore the approved workbook and retry.") from None
 
@@ -332,10 +302,7 @@ def skill_intelligence(db: DbSession, actor: Actor, employee_id: int | None = No
 def intelligence_mappings(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     from intelligence_service import provenance
-    query = db.query(models.SourceRecord)
-    if workbook_for(db, actor):
-        query = query.filter_by(workbook=workbook_for(db, actor))
-    records = query.all()
+    records = db.query(models.SourceRecord).all()
     mappings = [r for r in records if r.entity_type == "mapping"]
     rows = []
     for mapping in mappings:
@@ -343,9 +310,7 @@ def intelligence_mappings(db: DbSession, actor: Actor):
                   and r.source_key == mapping.details.get("skill_key") and r.fingerprint]
         learning = [r for r in records if r.entity_type == "learning" and r.workbook == mapping.workbook
                     and r.details.get("skill_key") == mapping.details.get("skill_key") and r.fingerprint]
-        role = db.get(models.RoleSkillMap, mapping.entity_id) if mapping.entity_id else None
-        role = db.get(models.Role, role.role_id) if role else None
-        rows.append({"role_name": role.role_name if role else mapping.details.get("role_key"), "role_id": mapping.details.get("role_key"), "skill_id": mapping.details.get("skill_key"),
+        rows.append({"role_id": mapping.details.get("role_key"), "skill_id": mapping.details.get("skill_key"),
             "skill_name": skills[0].details.get("name") if len(skills) == 1 else "Missing skill reference",
             "target": mapping.details.get("target_label"), "expected": mapping.details.get("is_expected"),
             "mapping_status": "Validated identity" if mapping.fingerprint and len(skills) == 1 else "Pending source validation",
@@ -358,7 +323,6 @@ def intelligence_mappings(db: DbSession, actor: Actor):
 @app.patch("/rag/sources/{source_id}/skills")
 def remap_source(source_id: str, payload: ws.SourceRemap, db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    check_function(db, actor, "DataOps")
     from source_mapping_service import remap
     return remap(db, actor, source_id, payload)
 
@@ -386,14 +350,10 @@ def source_status(db: DbSession, actor: Actor):
         missing = sum(issue.get("missing_skill_count", 0) for issue in result["issues"])
     except (OSError, ValueError, KeyError, BadZipFile):
         return {"status": "blocked", "reason": "Required source workbook unavailable", "approved_sop_available": False}
-    scope = function_scope(db, actor)
-    if scope == "Finance":
-        return {"status": "needs_review", "missing_finance_skill_references": missing,
-                "reason": "Review Finance mappings and question-bank eligibility.", "local_rag_sources": []}
     local_sources = public_source_status()
     approved_local = any(source["ingestion_status"] == "Ingested" and not source["synthetic_only"]
                          for source in local_sources)
-    return {"status": "needs_review", "missing_finance_skill_references": missing if scope != "DataOps" else 0,
+    return {"status": "needs_review", "missing_finance_skill_references": missing,
             "approved_sop_available": approved_local,
             "local_rag_sources": local_sources,
             "ingested_source_count": sum(source["ingestion_status"] == "Ingested" for source in local_sources),
@@ -405,14 +365,12 @@ def source_status(db: DbSession, actor: Actor):
 @app.get("/rag/sources")
 def rag_sources(db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
-    check_function(db, actor, "DataOps")
     return {"sources": public_source_status(), "content_exposed": False}
 
 
 @app.get("/rag/source-registry")
 def rag_source_registry(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    check_function(db, actor, "DataOps")
     sources, skills = source_registry()
     skill_rows = db.query(models.SourceRecord).filter_by(
         workbook="overall_rd.xlsx", entity_type="skill").order_by(models.SourceRecord.source_key).all()
@@ -435,7 +393,6 @@ def rag_source_registry(db: DbSession, actor: Actor):
 @app.post("/rag/batch/validate")
 def rag_batch_validate(payload: BatchValidationRequest, db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    check_function(db, actor, "DataOps")
     return validate_batch(payload.files)
 
 
@@ -443,7 +400,6 @@ def rag_batch_validate(payload: BatchValidationRequest, db: DbSession, actor: Ac
 async def rag_batch_upload(db: DbSession, actor: Actor, files: list[UploadFile] = File(...),
                            metadata: str = Form(...)):
     require(actor, "admin", "ld")
-    check_function(db, actor, "DataOps")
     try:
         raw = json.loads(metadata)
         mappings = [BatchMapping.model_validate(item) for item in raw]
@@ -465,7 +421,6 @@ async def rag_batch_upload(db: DbSession, actor: Actor, files: list[UploadFile] 
 def rag_retrieve(skill_id: str, intended_proficiency: str, query: str,
                  db: DbSession, actor: Actor, function: str = "DataOps"):
     require(actor, "admin", "ld", "reviewer")
-    check_function(db, actor, "DataOps")
     if actor.role == "reviewer":
         details = profile(db, actor.id)
         if not details or details.business_function != "DataOps":
@@ -480,7 +435,6 @@ def rag_retrieve(skill_id: str, intended_proficiency: str, query: str,
 @app.get("/rag/context")
 def rag_context(role_name: str, skill_name: str, db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
-    check_function(db, actor, "Finance")
     if actor.role == "reviewer" and (not profile(db, actor.id) or profile(db, actor.id).business_function != "Finance"):
         raise HTTPException(403, "Finance source context is outside your scope")
     try:
@@ -552,14 +506,12 @@ def question_output(db, question):
 def list_questions(db: DbSession, actor: Actor):
     require(actor, "admin", "ld", "reviewer")
     query = db.query(models.Question)
-    # A normal L&D identity has the same function boundary as the reviewer
-    # queue.  The historical internal administrator stays unscoped.
-    if actor.role == "reviewer" or (actor.role == "ld" and function_scope(db, actor)):
+    if actor.role == "reviewer":
         details = profile(db, actor.id)
         query = query.join(models.QuestionScope).join(models.RoleSkillMap,
             models.QuestionScope.role_skill_map_id == models.RoleSkillMap.id).join(models.Role).filter(
             models.Role.business_function == (details.business_function if details else ""))
-    rows = query.filter(models.Question.status != "archived").order_by(models.Question.id.desc()).all()
+    rows = query.order_by(models.Question.id.desc()).all()
     if config.LLM_PROVIDER == "luna":
         rows = [q for q in rows if not ("synthetic" in (q.rag_source or "").lower()
             or "synthetic" in q.question_text.lower())]
@@ -582,19 +534,6 @@ def question_history(question_id: int, db: DbSession, actor: Actor):
     return db.query(models.QuestionRevision).filter_by(question_id=question_id).order_by(models.QuestionRevision.revision).all()
 
 
-@app.post("/questions/{question_id}/send-for-review", response_model=schemas.QuestionResponse)
-def send_question_for_review(question_id: int, payload: ws.QuestionManage, db: DbSession, actor: Actor):
-    from governance_service import manage_question
-    return manage_question(db, actor, question_id, payload, archive=False)
-
-
-@app.delete("/questions/{question_id}")
-def remove_question(question_id: int, payload: ws.QuestionManage, db: DbSession, actor: Actor):
-    from governance_service import manage_question
-    question = manage_question(db, actor, question_id, payload, archive=True)
-    return {"id": question.id, "status": "archived", "message": "Question removed from the bank. Assessment and review history is retained."}
-
-
 @app.post("/questions/{question_id}/regenerate", status_code=201)
 def regenerate_question(question_id: int, db: DbSession, actor: Actor):
     scoped_question(db, actor, question_id)
@@ -614,8 +553,6 @@ def assign_assessment(payload: schemas.AssessmentCreate, db: DbSession, actor: A
     require(actor, "admin", "ld", "manager")
     if actor.role == "manager":
         manager_access(db, actor, payload.employee_id)
-    employee_access(db, actor, payload.employee_id)
-    mapping_access(db, actor, payload.role_skill_map_id)
     return create_assessment(db, payload, actor.id)
 
 
@@ -631,8 +568,6 @@ def list_assessments(db: DbSession, actor: Actor, employee_id: int | None = None
             models.Assessment.employee_id == models.UserProfile.user_id).filter(models.UserProfile.manager_id == actor.id)
     else:
         query = db.query(models.Assessment).filter_by(employee_id=actor.id)
-    if actor.role == "ld" and function_scope(db, actor):
-        query = query.join(models.UserProfile, models.Assessment.employee_id == models.UserProfile.user_id).filter(models.UserProfile.business_function == function_scope(db, actor))
     rows = query.order_by(models.Assessment.id.desc()).all()
     return [row for row in rows if assessment_visible(db, row)]
 
@@ -726,10 +661,6 @@ def manager_inbox(db: DbSession, actor: Actor):
 def leader_aggregates(db: DbSession, actor: Actor, group_by: str = "skill,level", role_id: int | None = None,
                       team: str | None = None, function: str | None = None, hub: str | None = None,
                       skill_id: int | None = None, level: Annotated[int | None, Query(ge=0, le=5)] = None):
-    if actor.role == "ld" and function_scope(db, actor):
-        if function:
-            check_function(db, actor, function)
-        function = function_scope(db, actor)
     return aggregate(db, actor, group_by, dict(role_id=role_id, team=team, function=function,
                                              hub=hub, skill_id=skill_id, level=level))
 
@@ -781,13 +712,12 @@ def audit_events(db: DbSession, actor: Actor, action: str | None = None,
         query = query.filter(or_(models.AuditEvent.subject_id.in_(subjects), models.AuditEvent.actor_id == actor.id))
     if action:
         query = query.filter(models.AuditEvent.action == action)
-    return [event for event in query.order_by(models.AuditEvent.id) if visible_event(db, actor, event)][:limit]
+    return query.order_by(models.AuditEvent.id).limit(limit).all()
 
 
 @app.post("/quests", status_code=201)
 def create_quest(payload: ws.QuestCreate, db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    check_function(db, actor, payload.business_function)
     quest = models.Quest(**payload.model_dump())
     db.add(quest)
     db.flush()
@@ -804,8 +734,6 @@ def list_quests(db: DbSession, actor: Actor):
         query = query.filter(or_(models.Quest.business_function.is_(None),
                                 models.Quest.business_function == (details.business_function if details else "")))
         return [workflows.quest_progress(db, actor, quest) for quest in query.order_by(models.Quest.id)]
-    if actor.role == "ld" and function_scope(db, actor):
-        query = query.filter_by(business_function=function_scope(db, actor))
     return query.order_by(models.Quest.id).all()
 
 

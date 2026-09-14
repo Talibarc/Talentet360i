@@ -2,7 +2,6 @@ from fastapi import HTTPException
 from sqlalchemy import update
 import models
 from auth import mapping_access, require
-from function_scope import function_scope
 from event_service import audit, notify
 
 
@@ -36,7 +35,7 @@ def scoped_question(db, actor, question_id):
     scope = db.get(models.QuestionScope, question_id)
     if scope:
         mapping_access(db, actor, scope.role_skill_map_id)
-    elif actor.role not in {"admin", "ld"} or function_scope(db, actor):
+    elif actor.role not in {"admin", "ld"}:
         raise HTTPException(409, "Legacy question requires an explicit role-skill scope")
     return question
 
@@ -64,8 +63,6 @@ def review(db, actor, question_id, payload):
 
 def edit(db, actor, question_id, payload):
     question = scoped_question(db, actor, question_id)
-    if question.status == "archived":
-        raise HTTPException(409, "Archived question cannot be edited")
     previous = latest_revision(db, question_id)
     if not previous or previous.revision != payload.expected_revision:
         raise HTTPException(409, "Question revision changed; reload before editing")
@@ -84,23 +81,4 @@ def edit(db, actor, question_id, payload):
     question.reviewed_by_id = None
     db.flush()
     record_question(db, question, actor.id, "edited", is_critical=payload.is_critical)
-    return question
-
-
-def manage_question(db, actor, question_id, payload, *, archive):
-    require(actor, "admin", "ld")
-    question = scoped_question(db, actor, question_id)
-    previous = latest_revision(db, question_id)
-    if question.status == "archived" or not previous or previous.revision != payload.expected_revision:
-        raise HTTPException(409, "Question changed or was removed. Refresh and try again.")
-    if not archive and question.status == "pending_review":
-        raise HTTPException(409, "Question is already awaiting review")
-    previous_status = question.status
-    changed = db.execute(update(models.Question).where(models.Question.id == question_id,
-        models.Question.status == previous_status).values(status="archived" if archive else "pending_review",
-            reviewed_at=None, reviewed_by_id=None, review_comment=payload.comment))
-    if changed.rowcount != 1:
-        raise HTTPException(409, "Question changed. Refresh and try again.")
-    db.refresh(question)
-    record_question(db, question, actor.id, "archived" if archive else "sent_for_review")
     return question

@@ -42,9 +42,6 @@ export interface Question {
   correct_answer: string;
   explanation: string;
   rag_source: string | null;
-  difficulty?: string | null;
-  document_references?: string[];
-  chunk_references?: string[];
   status: string;
 }
 export interface Revision {

@@ -49,21 +49,21 @@ const labels: Record<string, string> = {
   leader: "Leader",
 };
 
-const ldItems: {id: string; label: string; icon: typeof Database; roles: string[]; functions?: string[]}[] = [
-  ...[["finance", "Create Questions"]].map(([id, label]) => ({
-    id, label, icon: Database, roles: ["ld"], functions: ["Finance"],
+const items = [
+  ...[
+    ["overview", "L&D Overview"],
+    ["finance", "Finance Sources & Generation"],
+    ["dataops", "DataOps/RD Sources & Generation"],
+    ["bank", "Question Bank"],
+    ["administration", "Assessment Administration"],
+    ["training-admin", "Training Mappings"],
+    ["sources", "Source Governance"],
+  ].map(([id, label]) => ({
+    id,
+    label,
+    icon: Database,
+    roles: ["admin", "ld"],
   })),
-  // DataOps starts with its document workflow, followed by question creation.
-  ...[["sources", "Sources"], ["dataops", "Create Questions"]].map(([id, label]) => ({
-    id, label, icon: Database, roles: ["ld"], functions: ["DataOps"],
-  })),
-  ...[["bank", "Question Bank"], ["administration", "Assessments"], ["training-admin", "Training Mappings"]].map(([id, label]) => ({
-    id, label, icon: Database, roles: ["ld"],
-  })),
-];
-
-const items: {id: string; label: string; icon: typeof Database; roles: string[]; functions?: string[]}[] = [
-  ...ldItems,
   ...[
     ["home", "My Assessments"],
     ["results", "My Results"],
@@ -111,7 +111,7 @@ const items: {id: string; label: string; icon: typeof Database; roles: string[];
     id: "audit",
     label: "Audit History",
     icon: ShieldCheck,
-    roles: Object.keys(labels).filter(r=>r!=="employee"),
+    roles: Object.keys(labels),
   },
 ];
 
@@ -165,7 +165,7 @@ export default function App() {
               </p>
               {data.identities.length ? (
                 <div className="identity-grid">
-                  {data.identities.filter(i=>i.role!=="admin" && !!i.business_function).map((i) => (
+                  {data.identities.map((i) => (
                     <button
                       key={i.id}
                       aria-label={`${labels[i.role] ?? i.role} ${i.business_function ?? "All functions"}`}
@@ -182,7 +182,10 @@ export default function App() {
                   enable demo identities for this local environment.
                 </Empty>
               )}
-              <div className="source-note">Local demo workspace              </div>
+              <div className="source-note">
+                Generation provider: {data.provider} · Local demo identities ·
+                Loopback validation only
+              </div>
             </Panel>
           </main>
         ) : (
@@ -190,7 +193,7 @@ export default function App() {
             key={id}
             id={id}
             provider={data.provider}
-            identities={data.identities.filter(i=>i.role!=="admin" && !!i.business_function)}
+            identities={data.identities}
             switchIdentity={setId}
           />
         )
@@ -241,7 +244,7 @@ function Workspace({
   return (
     <DataState state={me}>
       {(user) => {
-        const nav = items.filter((i) => i.roles.includes(user.role) && (!i.functions || i.functions.includes(user.business_function ?? ""))),
+        const nav = items.filter((i) => i.roles.includes(user.role)),
           active = nav.find((i) => i.id === page) ?? nav[0];
         return (
           <div className="app-shell">
@@ -397,13 +400,11 @@ function Workspace({
                         api={api}
                         refresh={refresh}
                         initialStatus={
-                          active.id === "review-history"
-                            ? "approved"
+                          active.id === "review-history" || active.id === "bank"
+                            ? "all"
                             : "pending_review"
                         }
                         businessFunction={user.business_function}
-                        catalog={catalog}
-                        canManage={user.role === "ld"}
                       />
                     ) : ["home", "results", "evidence", "quests"].includes(
                         active.id,
@@ -452,7 +453,7 @@ function Workspace({
                     ) : active.id === "notifications" ? (
                       <Notifications api={api} refresh={refresh} />
                     ) : (
-                      <Governance api={api} businessFunction={user.business_function} />
+                      <Governance api={api} />
                     )}
                   </div>
                 )}

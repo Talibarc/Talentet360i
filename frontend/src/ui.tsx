@@ -23,7 +23,7 @@ export function Panel({
 export function Chip({ children }: { children: ReactNode }) {
   return (
     <span className={`chip ${String(children).replaceAll(" ", "_")}`}>
-      {({pending_review: "Pending Review", approved: "Approved", rejected: "Rejected", archived: "Archived"} as Record<string, string>)[String(children)] ?? String(children).replaceAll("_", " ")}
+      {String(children).replaceAll("_", " ")}
     </span>
   );
 }

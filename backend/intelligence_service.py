@@ -117,10 +117,6 @@ def intelligence(db, actor, employee_id=None):
                     users = users.filter(getattr(models.UserProfile, field) == getattr(person, field))
         if actor.role == "manager":
             users = users.filter(models.UserProfile.manager_id == actor.id)
-    from function_scope import function_scope
-    scope = function_scope(db, actor)
-    if actor.role == "ld" and scope:
-        users = users.join(models.UserProfile, models.UserProfile.user_id == models.User.id).filter(models.UserProfile.business_function == scope)
     employees = users.all()
     rows = [row for user in employees for row in employee_skills(db, user)]
     coverage = {"expected_records": len(rows), "validated_mappings": sum(bool(r["provenance"]) for r in rows),

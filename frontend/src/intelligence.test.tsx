@@ -29,15 +29,21 @@ it.each(["finance", "dataops"])("separates %s controls", async (page) => {
       provider="luna"
     />,
   );
-  expect(screen.queryByText(/luna/i)).not.toBeInTheDocument();
+  expect(screen.getByText("luna")).toBeInTheDocument();
   expect(screen.queryByText(/Mock exercises/)).not.toBeInTheDocument();
   if (page === "finance") {
     expect(
-      screen.queryByText("Use approved source documents only"),
+      screen.queryByText("Bulk document ingestion"),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("Require approved SOP")).not.toBeInTheDocument();
   } else {
-    expect(screen.getByText("Use approved source documents only")).toBeInTheDocument();
-    expect(screen.queryByText("Add approved documents")).not.toBeInTheDocument();
+    expect(screen.getByText("Bulk document ingestion")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Import workbook mappings"),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/No local documents ingested/),
+    ).toBeInTheDocument();
   }
 });
 it("searches full skill labels and preserves explicit selections", async () => {
@@ -84,8 +90,8 @@ it("remapping requires explicit old/new confirmation and sends stable IDs", asyn
   const modal = within(screen.getByRole("dialog"));
   await userEvent.click(modal.getByLabelText("A — Original"));
   await userEvent.click(modal.getByLabelText("B — Replacement"));
-  expect(modal.getByText("Current: Original")).toBeInTheDocument();
-  expect(modal.getByText("Proposed: Replacement")).toBeInTheDocument();
+  expect(modal.getByText("Current: A")).toBeInTheDocument();
+  expect(modal.getByText("Proposed: B")).toBeInTheDocument();
   await userEvent.type(
     modal.getByLabelText("Reason for change"),
     "Correct mapping",

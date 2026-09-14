@@ -31,9 +31,9 @@ it("does not invent a missing catalog mapping", () => {
     .toBe("Mapping unavailable — pending source validation.");
 });
 
-it("keeps an empty DataOps review queue focused on the reviewer workflow", async () => {
+it("shows the permanent DataOps question-source limitation", async () => {
   const api = vi.fn().mockResolvedValue([]) as unknown as Api;
   render(<Reviewer api={api} refresh={vi.fn()} businessFunction="DataOps" />);
-  expect(await screen.findByText(/No DataOps questions in this queue/)).toBeInTheDocument();
-  expect(screen.queryByText(/Luna|RAG/i)).not.toBeInTheDocument();
+  expect(await screen.findByText(/Unavailable — excluded from MVP/)).toBeInTheDocument();
+  expect(screen.getByText(/Imported records: 0/)).toBeInTheDocument();
 });
