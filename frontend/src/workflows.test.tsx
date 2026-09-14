@@ -6,7 +6,7 @@ import Employee, { TniView } from "./Employee";
 import Reviewer from "./Reviewer";
 import Manager from "./Manager";
 import Governance, { Notifications } from "./Governance";
-import Admin from "./Admin";
+import Admin from "./SourcePages";
 import { ActionForm, Modal } from "./ui";
 import type { Api } from "./api";
 import type { Catalog } from "./Admin";
@@ -56,12 +56,25 @@ const assessment = {
 };
 describe("role workflows", () => {
   it("allows local demo selection while Luna remains the configured provider", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      provider: "luna",
-      identities: [{ id: 701, role: "employee", label: "Synthetic", business_function: "Finance" }],
-    })));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          provider: "luna",
+          identities: [
+            {
+              id: 701,
+              role: "employee",
+              label: "Synthetic",
+              business_function: "Finance",
+            },
+          ],
+        }),
+      ),
+    );
     render(<App />);
-    expect(await screen.findByRole("button", { name: "Employee Finance" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Associate Finance" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
     expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
   });
@@ -93,10 +106,10 @@ describe("role workflows", () => {
     });
     render(<App />);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Employee Finance" }),
+      await screen.findByRole("button", { name: "Associate Finance" }),
     );
     expect(
-      await screen.findByRole("heading", { name: "My development" }),
+      await screen.findByRole("heading", { name: "My Assessments" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Sources & generation" }),
@@ -374,7 +387,9 @@ describe("role workflows", () => {
       },
       "/questions/generate": [],
     });
-    render(<Admin api={api} catalog={catalog} refresh={vi.fn()} />);
+    render(
+      <Admin api={api} catalog={catalog} refresh={vi.fn()} page="finance" />,
+    );
     await userEvent.selectOptions(
       screen.getByLabelText("Role and skill"),
       "601",
@@ -387,9 +402,12 @@ describe("role workflows", () => {
         role_skill_map_id: 601,
         question_count: 3,
         require_approved_sop: false,
+        difficulty: "Easy",
       }),
     );
-    expect(screen.getByText("Level 0")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Mock exercises are synthetic/),
+    ).toBeInTheDocument();
   });
   it("action errors remain visible and allow retry", async () => {
     const save = vi

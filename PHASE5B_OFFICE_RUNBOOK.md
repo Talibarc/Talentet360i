@@ -1,3 +1,9 @@
+# Final office validation update
+
+Use the office pull/startup and final acceptance checklist in [FINAL_IMPLEMENTATION_REPORT.md](FINAL_IMPLEMENTATION_REPORT.md). Do not reseed or reset the existing office database. Correct SRC_02 through the audited **Edit skill mapping** dialog; content/chunk versions are preserved. Workbook import and TNI no longer depend on mock mode. The only live-model step is one controlled, approved-SOP Luna draft generation request after local configuration and source checks.
+
+Keep `LLM_PROVIDER=luna`, `DEMO_IDENTITIES_ENABLED=true`, `ALLOW_SYNTHETIC_RAG=false` only for controlled validation with the backend bound to `127.0.0.1`. Never expose demo identities on public/production hosting. Missing official policy remains pending after a successful Luna test.
+
 # Phase 5B office-laptop runbook
 
 Keep source documents, the manifest, local index, `.env`, credentials, and databases outside Git.

@@ -129,6 +129,16 @@ class AssessmentItem(Base):
     answered_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class AssessmentSkillResult(Base):
+    __tablename__ = "assessment_skill_results"
+    assessment_id = Column(ForeignKey("assessments.id"), primary_key=True)
+    role_skill_map_id = Column(ForeignKey("role_skill_maps.id"), primary_key=True)
+    total_questions = Column(Integer, nullable=False)
+    correct_answers = Column(Integer, nullable=False)
+    score_percentage = Column(Integer, nullable=False)
+    achieved_level = Column(Integer, nullable=True)
+
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
     user_id = Column(ForeignKey("users.id"), primary_key=True)
@@ -188,6 +198,13 @@ class SourceRecord(Base):
     fingerprint = Column(String(64), nullable=False)
     details = Column(JSON, nullable=False)
     __table_args__ = (UniqueConstraint("workbook", "sheet", "source_key"),)
+
+
+class SourceSkillOverride(Base):
+    """Audited metadata overlay; original document bytes and chunk IDs stay intact."""
+    __tablename__ = "source_skill_overrides"
+    source_id = Column(String(250), primary_key=True)
+    skill_ids = Column(JSON, nullable=False)
 
 
 class ScoringPolicy(Base):

@@ -6,7 +6,6 @@ import {
   CheckSquare,
   ClipboardList,
   Database,
-  FileCheck,
   GraduationCap,
   LayoutDashboard,
   Menu,
@@ -22,7 +21,8 @@ import type { Identity, User, Role, Skill, Mapping } from "./types";
 
 import type { Catalog } from "./Admin";
 
-import Admin from "./Admin";
+import Admin from "./SourcePages";
+import Intelligence, { MappingCoverage } from "./Intelligence";
 
 import Reviewer from "./Reviewer";
 
@@ -44,68 +44,72 @@ const labels: Record<string, string> = {
   admin: "Admin",
   ld: "L&D",
   reviewer: "SME / Reviewer",
-  employee: "Employee",
+  employee: "Associate",
   manager: "Manager",
   leader: "Leader",
 };
 
 const items = [
-  {
-    id: "admin",
-    label: "Sources & generation",
+  ...[
+    ["overview", "L&D Overview"],
+    ["finance", "Finance Sources & Generation"],
+    ["dataops", "DataOps/RD Sources & Generation"],
+    ["bank", "Question Bank"],
+    ["administration", "Assessment Administration"],
+    ["training-admin", "Training Mappings"],
+    ["sources", "Source Governance"],
+  ].map(([id, label]) => ({
+    id,
+    label,
     icon: Database,
     roles: ["admin", "ld"],
-  },
-
-  {
-    id: "review",
-    label: "Question review",
+  })),
+  ...[
+    ["home", "My Assessments"],
+    ["results", "My Results"],
+    ["skills", "My Skills"],
+    ["training", "My Training Plan"],
+    ["quests", "Progress and achievements"],
+    ["evidence", "My evidence"],
+  ].map(([id, label]) => ({ id, label, icon: BookOpen, roles: ["employee"] })),
+  ...[
+    ["review", "Review Queue"],
+    ["question-review", "Question Review"],
+    ["review-history", "Approved/Rejected History"],
+  ].map(([id, label]) => ({
+    id,
+    label,
     icon: CheckSquare,
-    roles: ["admin", "ld", "reviewer"],
-  },
-
-  {
-    id: "home",
-    label: "My development",
+    roles: ["reviewer"],
+  })),
+  ...[
+    ["manager", "Team Overview"],
+    ["team-gaps", "Team Skill Gaps"],
+    ["team-progress", "Assessment Progress"],
+    ["team-training", "TNI and Course Recommendations"],
+    ["team-employee", "Employee drill-down"],
+  ].map(([id, label]) => ({ id, label, icon: Users, roles: ["manager"] })),
+  ...[
+    ["leader", "Skill Distribution"],
+    ["org-gaps", "Organizational Gaps"],
+    ["readiness", "Readiness"],
+    ["movement", "Skill movement/trends"],
+    ["indicators", "Decision indicators"],
+  ].map(([id, label]) => ({
+    id,
+    label,
     icon: LayoutDashboard,
-    roles: ["employee"],
-  },
-
-  {
-    id: "learning",
-    label: "Skills & learning",
-    icon: BookOpen,
-    roles: ["employee"],
-  },
-
-  {
-    id: "evidence",
-    label: "My evidence",
-    icon: FileCheck,
-    roles: ["employee"],
-  },
-
-  { id: "quests", label: "SkillQuest & XP", icon: Target, roles: ["employee"] },
-
-  { id: "manager", label: "Team reviews", icon: Users, roles: ["manager"] },
-
-  {
-    id: "leader",
-    label: "Skill intelligence",
-    icon: LayoutDashboard,
-    roles: ["leader", "admin", "ld"],
-  },
-
+    roles: ["leader"],
+  })),
   {
     id: "notifications",
     label: "Notifications",
     icon: Bell,
     roles: Object.keys(labels),
   },
-
   {
     id: "audit",
-    label: "Governance & audit",
+    label: "Audit History",
     icon: ShieldCheck,
     roles: Object.keys(labels),
   },
@@ -188,6 +192,7 @@ export default function App() {
           <Workspace
             key={id}
             id={id}
+            provider={data.provider}
             identities={data.identities}
             switchIdentity={setId}
           />
@@ -200,15 +205,17 @@ export default function App() {
 function Workspace({
   id,
   identities,
+  provider,
   switchIdentity,
 }: {
   id: number;
   identities: Identity[];
+  provider: string;
   switchIdentity: (id: number | null) => void;
 }) {
   const api = useMemo(() => createApi(id), [id]),
     [version, setVersion] = useState(0),
-    [page, setPage] = useState(""),
+    [page, setPage] = useState(() => window.location.hash.slice(1)),
     [mobile, setMobile] = useState(false);
 
   const me = useResource<User>(api, "/me", version),
@@ -267,6 +274,7 @@ function Workspace({
                     aria-current={active.id === i.id ? "page" : undefined}
                     onClick={() => {
                       setPage(i.id);
+                      window.history.replaceState(null, "", `#${i.id}`);
                       setMobile(false);
                     }}
                   >
@@ -368,15 +376,37 @@ function Workspace({
                   <p role="status">Loading workspace…</p>
                 ) : (
                   <div key={`${active.id}-${version}`} className="page-content">
-                    {active.id === "admin" ? (
-                      <Admin api={api} catalog={catalog} refresh={refresh} />
-                    ) : active.id === "review" ? (
+                    {[
+                      "overview",
+                      "finance",
+                      "dataops",
+                      "sources",
+                      "administration",
+                    ].includes(active.id) ? (
+                      <Admin
+                        api={api}
+                        catalog={catalog}
+                        refresh={refresh}
+                        page={active.id}
+                        provider={provider}
+                      />
+                    ) : [
+                        "review",
+                        "question-review",
+                        "review-history",
+                        "bank",
+                      ].includes(active.id) ? (
                       <Reviewer
                         api={api}
                         refresh={refresh}
+                        initialStatus={
+                          active.id === "review-history" || active.id === "bank"
+                            ? "all"
+                            : "pending_review"
+                        }
                         businessFunction={user.business_function}
                       />
-                    ) : ["home", "learning", "evidence", "quests"].includes(
+                    ) : ["home", "results", "evidence", "quests"].includes(
                         active.id,
                       ) ? (
                       <Employee
@@ -386,8 +416,15 @@ function Workspace({
                         page={active.id}
                         refresh={refresh}
                       />
-                    ) : active.id === "manager" ? (
-                      <Manager api={api} catalog={catalog} refresh={refresh} />
+                    ) : ["manager", "team-progress", "team-employee"].includes(
+                        active.id,
+                      ) ? (
+                      <Manager
+                        api={api}
+                        catalog={catalog}
+                        refresh={refresh}
+                        page={active.id}
+                      />
                     ) : active.id === "leader" ? (
                       <Suspense
                         fallback={
@@ -396,6 +433,23 @@ function Workspace({
                       >
                         <Leader api={api} catalog={catalog} />
                       </Suspense>
+                    ) : active.id === "training-admin" ? (
+                      <MappingCoverage api={api} />
+                    ) : [
+                        "skills",
+                        "training",
+                        "team-gaps",
+                        "team-training",
+                        "org-gaps",
+                        "readiness",
+                        "movement",
+                        "indicators",
+                      ].includes(active.id) ? (
+                      <Intelligence
+                        api={api}
+                        role={user.role}
+                        view={active.id}
+                      />
                     ) : active.id === "notifications" ? (
                       <Notifications api={api} refresh={refresh} />
                     ) : (

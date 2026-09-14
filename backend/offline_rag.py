@@ -309,7 +309,15 @@ def load_index(index_dir: Path | None = None) -> dict[str, Any]:
     if not path.is_file():
         return {"version": 1, "sources": [], "chunks": [], "limitation": NO_CONTEXT}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        from database import SessionLocal
+        from models import SourceSkillOverride
+        with SessionLocal() as db:
+            overrides = {row.source_id: row.skill_ids for row in db.query(SourceSkillOverride)}
+        for row in payload.get("sources", []) + payload.get("chunks", []):
+            if row.get("source_id") in overrides:
+                row["skill_ids"] = overrides[row["source_id"]]
+        return payload
     except (OSError, json.JSONDecodeError):
         return {"version": 1, "sources": [], "chunks": [], "limitation": "Local RAG index is unavailable"}
 
@@ -364,6 +372,8 @@ def public_source_status(index: dict[str, Any] | None = None) -> list[dict[str, 
     """Return source metadata only; never expose extracted content."""
     result = []
     for source in (index or load_index()).get("sources", []):
+        if config.LLM_PROVIDER == "luna" and source.get("synthetic_only"):
+            continue
         result.append({key: source.get(key) for key in (
             "source_id", "title", "skill_ids", "source_type", "owner", "original_reference",
             "role_bands", "intended_proficiencies", "availability_status", "ingestion_status",

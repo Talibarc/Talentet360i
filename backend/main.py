@@ -17,7 +17,7 @@ from database import Base, engine, get_db
 from auth import Actor, current_user, require, mapping_access, employee_access, manager_access, profile
 from event_service import audit, notify
 from governance_service import record_question, scoped_question, latest_revision, edit, review
-from assessment_service import create_assessment, get_assessment, submit_assessment
+from assessment_service import create_assessment, get_assessment, submit_assessment, assessment_visible
 from question_service import generate_question_drafts, generate_rd_question_drafts
 from llm_provider import ProviderError
 from excel_loader import validate_workbooks
@@ -185,6 +185,8 @@ def list_roles(db: DbSession, actor: Actor):
     if actor.role not in {"admin", "ld"}:
         details = profile(db, actor.id)
         query = query.filter(models.Role.business_function == (details.business_function if details else ""))
+    if config.LLM_PROVIDER == "luna":
+        query = query.join(models.SourceRecord, (models.SourceRecord.entity_id == models.Role.id) & (models.SourceRecord.entity_type == "role")).filter(models.SourceRecord.fingerprint != "")
     return query.order_by(models.Role.id).all()
 
 
@@ -207,6 +209,8 @@ def list_skills(db: DbSession, actor: Actor):
             models.Role.business_function == (details.business_function if details else ""))
         if actor.role == "employee":
             query = query.filter(models.Role.id == (details.job_role_id if details else -1))
+    if config.LLM_PROVIDER == "luna":
+        query = query.join(models.SourceRecord, (models.SourceRecord.entity_id == models.Skill.id) & (models.SourceRecord.entity_type == "skill")).filter(models.SourceRecord.fingerprint != "")
     result = []
     for skill in query.distinct().order_by(models.Skill.id):
         item = schemas.SkillResponse.model_validate(skill).model_dump()
@@ -242,6 +246,8 @@ def list_mappings(db: DbSession, actor: Actor):
         query = query.join(models.Role).filter(models.Role.business_function == (details.business_function if details else ""))
         if actor.role == "employee":
             query = query.filter(models.RoleSkillMap.role_id == (details.job_role_id if details else -1))
+    if config.LLM_PROVIDER == "luna":
+        query = query.join(models.SourceRecord, (models.SourceRecord.entity_id == models.RoleSkillMap.id) & (models.SourceRecord.entity_type == "mapping")).filter(models.SourceRecord.fingerprint != "")
     return query.order_by(models.RoleSkillMap.id).all()
 
 
@@ -270,16 +276,55 @@ def validate_source_data(db: DbSession, actor: Actor):
 def source_inventory(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
     from source_import import source_plan
-    return source_plan()[1]
+    try:
+        return source_plan()[1]
+    except (OSError, ValueError, KeyError, BadZipFile):
+        raise HTTPException(409, "Required source workbook or schema unavailable. Restore the approved workbook and retry.") from None
 
 
 @app.post("/data/import")
 def import_source_data(db: DbSession, actor: Actor):
     require(actor, "admin", "ld")
-    if config.LLM_PROVIDER != "mock":
-        raise HTTPException(409, "Source import requires mock mode")
     from source_import import import_sources
-    return import_sources(db, actor.id)
+    try:
+        return import_sources(db, actor.id)
+    except (OSError, ValueError, KeyError, BadZipFile):
+        raise HTTPException(409, "Required source workbook or schema unavailable. Restore the approved workbook and retry.") from None
+
+
+@app.get("/skill-intelligence")
+def skill_intelligence(db: DbSession, actor: Actor, employee_id: int | None = None):
+    from intelligence_service import intelligence
+    return intelligence(db, actor, employee_id)
+
+
+@app.get("/skill-intelligence/mappings")
+def intelligence_mappings(db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    from intelligence_service import provenance
+    records = db.query(models.SourceRecord).all()
+    mappings = [r for r in records if r.entity_type == "mapping"]
+    rows = []
+    for mapping in mappings:
+        skills = [r for r in records if r.entity_type == "skill" and r.workbook == mapping.workbook
+                  and r.source_key == mapping.details.get("skill_key") and r.fingerprint]
+        learning = [r for r in records if r.entity_type == "learning" and r.workbook == mapping.workbook
+                    and r.details.get("skill_key") == mapping.details.get("skill_key") and r.fingerprint]
+        rows.append({"role_id": mapping.details.get("role_key"), "skill_id": mapping.details.get("skill_key"),
+            "skill_name": skills[0].details.get("name") if len(skills) == 1 else "Missing skill reference",
+            "target": mapping.details.get("target_label"), "expected": mapping.details.get("is_expected"),
+            "mapping_status": "Validated identity" if mapping.fingerprint and len(skills) == 1 else "Pending source validation",
+            "learning_status": "Mapped references; suitability pending validation" if learning else "No validated course recommendation available.",
+            "resources": [{"resource_id": r.details.get("resource_id"), "title": r.details.get("title"),
+                           "provenance": provenance(r)} for r in learning], "provenance": provenance(mapping)})
+    return {"mappings": rows, "pending_policy": "Pending policy validation."}
+
+
+@app.patch("/rag/sources/{source_id}/skills")
+def remap_source(source_id: str, payload: ws.SourceRemap, db: DbSession, actor: Actor):
+    require(actor, "admin", "ld")
+    from source_mapping_service import remap
+    return remap(db, actor, source_id, payload)
 
 
 @app.post("/assessments/{assessment_id}/start")
@@ -403,8 +448,8 @@ def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, 
     require(actor, "admin", "ld", "reviewer")
     mapping = mapping_access(db, actor, payload.role_skill_map_id)
     source_mapping = db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first()
-    if source_mapping and source_mapping.workbook == "finance_assessment.xlsx":
-        raise HTTPException(409, "Workbook-backed mappings use imported questions only. Mapping unavailable — pending source validation.")
+    if config.LLM_PROVIDER == "luna" and not source_mapping:
+        raise HTTPException(409, "Import a validated source mapping before generation")
     if not mapping.is_expected or mapping.target_level is None:
         raise HTTPException(400, "Questions cannot be generated for a non-expected skill")
     if payload.require_approved_sop and (not source_mapping or source_mapping.workbook != "overall_rd.xlsx"):
@@ -412,13 +457,6 @@ def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, 
     role, skill = db.get(models.Role, mapping.role_id), db.get(models.Skill, mapping.skill_id)
     provenance = None
     if source_mapping and source_mapping.workbook == "overall_rd.xlsx":
-        existing = db.query(models.Question).join(models.QuestionScope).filter(
-            models.QuestionScope.role_skill_map_id == mapping.id,
-            models.Question.skill_level == mapping.target_level,
-            models.Question.status == "approved",
-        ).order_by(models.Question.id).limit(payload.question_count).all()
-        if existing:
-            return [question_output(db, question) for question in existing]
         source_skill = db.query(models.SourceRecord).filter_by(
             entity_type="skill", entity_id=skill.id, workbook="overall_rd.xlsx").first()
         if not source_skill:
@@ -426,11 +464,16 @@ def generate_questions(payload: schemas.QuestionGenerateRequest, db: DbSession, 
         drafts, provenance = generate_rd_question_drafts(
             role.role_grade or role.role_name, source_skill.source_key, skill.name, mapping.target_level,
             mapping.target_label or f"Level {mapping.target_level}", payload.difficulty, payload.question_count)
+    elif source_mapping and source_mapping.workbook == "finance_assessment.xlsx":
+        from question_service import generate_finance_mapped
+        drafts, provenance = generate_finance_mapped(db, mapping, source_mapping, payload)
     else:
         drafts = generate_question_drafts(role.role_name, skill.name, mapping.target_level,
             mapping.target_label or f"Level {mapping.target_level}", skill.description or "", payload.question_count)
     questions = []
     for draft in drafts:
+        if provenance and not provenance["synthetic_only"]:
+            draft.rag_source = "Approved source context: " + "; ".join(provenance["document_references"])
         question = models.Question(skill_id=skill.id, skill_level=mapping.target_level,
             **draft.model_dump(), status="pending_review", created_by_id=actor.id)
         db.add(question)
@@ -468,7 +511,11 @@ def list_questions(db: DbSession, actor: Actor):
         query = query.join(models.QuestionScope).join(models.RoleSkillMap,
             models.QuestionScope.role_skill_map_id == models.RoleSkillMap.id).join(models.Role).filter(
             models.Role.business_function == (details.business_function if details else ""))
-    return [question_output(db, question) for question in query.order_by(models.Question.id.desc()).all()]
+    rows = query.order_by(models.Question.id.desc()).all()
+    if config.LLM_PROVIDER == "luna":
+        rows = [q for q in rows if not ("synthetic" in (q.rag_source or "").lower()
+            or "synthetic" in q.question_text.lower())]
+    return [question_output(db, question) for question in rows]
 
 
 @app.patch("/questions/{question_id}/review", response_model=schemas.QuestionResponse)
@@ -485,6 +532,20 @@ def edit_question(question_id: int, payload: ws.QuestionEdit, db: DbSession, act
 def question_history(question_id: int, db: DbSession, actor: Actor):
     scoped_question(db, actor, question_id)
     return db.query(models.QuestionRevision).filter_by(question_id=question_id).order_by(models.QuestionRevision.revision).all()
+
+
+@app.post("/questions/{question_id}/regenerate", status_code=201)
+def regenerate_question(question_id: int, db: DbSession, actor: Actor):
+    scoped_question(db, actor, question_id)
+    scope = db.get(models.QuestionScope, question_id)
+    if not scope:
+        raise HTTPException(409, "Question requires a validated role-skill scope before regeneration")
+    grounding = db.get(models.QuestionGrounding, question_id)
+    drafts = generate_questions(schemas.QuestionGenerateRequest(role_skill_map_id=scope.role_skill_map_id,
+        question_count=1, difficulty=grounding.difficulty if grounding else "Moderate"), db, actor)
+    audit(db, actor.id, "question.regenerated", "question", question_id,
+          details={"original_question_id": question_id, "new_question_ids": [q["id"] for q in drafts]})
+    return drafts
 
 
 @app.post("/assessments", response_model=schemas.AssessmentResponse, status_code=201)
@@ -507,7 +568,8 @@ def list_assessments(db: DbSession, actor: Actor, employee_id: int | None = None
             models.Assessment.employee_id == models.UserProfile.user_id).filter(models.UserProfile.manager_id == actor.id)
     else:
         query = db.query(models.Assessment).filter_by(employee_id=actor.id)
-    return query.order_by(models.Assessment.id.desc()).all()
+    rows = query.order_by(models.Assessment.id.desc()).all()
+    return [row for row in rows if assessment_visible(db, row)]
 
 
 def accessible_assessment(db, actor, assessment_id, write=False):
@@ -515,6 +577,8 @@ def accessible_assessment(db, actor, assessment_id, write=False):
     if assessment is None:
         raise HTTPException(404, "Assessment not found")
     employee_access(db, actor, assessment.employee_id, write=write)
+    if not assessment_visible(db, assessment):
+        raise HTTPException(409, "Synthetic assessment is unavailable in this environment")
     return assessment
 
 
@@ -588,7 +652,7 @@ def manager_inbox(db: DbSession, actor: Actor):
         business_function=profile(db, actor.id).business_function if profile(db, actor.id) else "")]
     results = db.query(models.Assessment, models.ResultReview).join(models.ResultReview).filter(
         models.Assessment.employee_id.in_(reports), models.ResultReview.status == "pending_review").all()
-    return {"results": [{"assessment": assessment, "review": review} for assessment, review in results],
+    return {"results": [{"assessment": assessment, "review": review} for assessment, review in results if assessment_visible(db, assessment)],
             "evidence": [workflows.evidence_content(db, e) for e in db.query(models.Evidence).filter(
                 models.Evidence.employee_id.in_(reports), models.Evidence.status == "submitted")]}
 

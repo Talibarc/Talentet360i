@@ -27,16 +27,23 @@ export function createApi(userId: number | null) {
         signal,
         headers: {
           ...(userId ? { "x-demo-user-id": String(userId) } : {}),
-          ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
+          ...(body !== undefined && !multipart
+            ? { "Content-Type": "application/json" }
+            : {}),
         },
-        body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
+        body:
+          body === undefined
+            ? undefined
+            : multipart
+              ? body
+              : JSON.stringify(body),
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError")
         throw error;
       throw new ApiError(
         0,
-        "Cannot reach the local backend. Check that the mock server is running, then retry.",
+        "Cannot reach the local backend. Check that the backend is running, then retry.",
       );
     }
     const data = await response.json().catch(() => null);
@@ -55,7 +62,8 @@ export function createApi(userId: number | null) {
       throw new ApiError(
         response.status,
         [
-          response.status === 403 && detail.startsWith("Demo identities are disabled")
+          response.status === 403 &&
+          detail.startsWith("Demo identities are disabled")
             ? ""
             : messages[response.status],
           detail ||

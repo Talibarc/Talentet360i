@@ -192,6 +192,14 @@ def source_plan():
             "explanation": "Answer key supplied by the workbook; no separate rationale supplied."})
     catalogue = unique(FINANCE_FILE, "Training_Catalogue", 3, "course_id", ["course_title"])
     courses = {r["course_id"]: (n, r) for n, r in catalogue}
+    for n, r in catalogue:
+        add(FINANCE_FILE, "Training_Catalogue", n, r["course_id"], "course",
+            {str(k): v for k, v in r.items() if k is not None} | {"validation_status": "Pending source validation"})
+    for n, r in unique(FINANCE_FILE, "Skill_Gaps_TNI", 3, "gap_id",
+                       ["user_id", "role_id", "skill_id", "recommended_course_id"]):
+        add(FINANCE_FILE, "Skill_Gaps_TNI", n, r["gap_id"], "tni",
+            {str(k): v for k, v in r.items() if k is not None} | {"validation_status": "Pending source validation"})
+
     for n, r in unique(FINANCE_FILE, "Training_Skill_Map", 3, "training_skill_map_id", ["course_id", "skill_id"]):
         course = courses.get(r.get("course_id"))
         if (FINANCE_FILE.name, r.get("skill_id")) not in skill_ids or not course or not course[1].get("course_title"):
@@ -350,7 +358,6 @@ if __name__ == "__main__":
     if args.apply:
         import config
         from database import Base, engine, SessionLocal
-        if config.LLM_PROVIDER != "mock": raise SystemExit("Source import requires mock mode")
         Base.metadata.create_all(engine)
         with SessionLocal.begin() as db:
             result = import_sources(db)

@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 import models
 from learning_service import get_learning_resources
-from llm_provider import get_provider, ProviderError
+import config
+from deterministic_tni import narrative
 from schemas import EmployeeTniResponse, TniSkillGap, TniNarrative
 
 
@@ -11,16 +12,24 @@ def get_employee_tni(db: Session, employee_id: int):
     employee = db.get(models.User, employee_id)
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
-    provider = get_provider()
     assessments = (
         db.query(models.Assessment)
         .filter(models.Assessment.employee_id == employee_id,
                 models.Assessment.status == "submitted")
         .order_by(models.Assessment.submitted_at.desc(), models.Assessment.id.desc()).all()
     )
+    from types import SimpleNamespace
+    expanded = []
+    for assessment in assessments:
+        details = db.query(models.AssessmentSkillResult).filter_by(assessment_id=assessment.id).all()
+        expanded.extend([SimpleNamespace(id=assessment.id, role_skill_map_id=row.role_skill_map_id,
+            achieved_level=row.achieved_level, score_percentage=row.score_percentage) for row in details] or [assessment])
+    assessments = expanded
     seen = set()
     gaps = []
     for assessment in assessments:
+        if config.LLM_PROVIDER == "luna" and not db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=assessment.role_skill_map_id).first():
+            continue
         if assessment.role_skill_map_id in seen:
             continue
         seen.add(assessment.role_skill_map_id)
@@ -36,7 +45,7 @@ def get_employee_tni(db: Session, employee_id: int):
         resources, learning_status = source_learning(db, skill, role.business_function)
         facts = dict(skill_name=skill.name, score_percentage=assessment.score_percentage,
                      current_level=current, target_level=mapping.target_level, skill_gap=gap)
-        detail = (provider.tni(facts, [r.model_dump() for r in resources]) if current is not None else
+        detail = (narrative(facts, [r.model_dump() for r in resources]) if current is not None else
             TniNarrative(summary="Result pending policy validation. No proficiency level or gap has been inferred.",
                 development_focus="Validate the score-to-level policy before confirming proficiency.",
                 next_steps=["Ask L&D for an approved scoring and proficiency policy."],
@@ -44,8 +53,25 @@ def get_employee_tni(db: Session, employee_id: int):
         allowed = {r.resource_id: r for r in resources}
         selected = detail.recommended_resource_ids
         if len(set(selected)) != len(selected) or any(key not in allowed for key in selected):
-            raise ProviderError("Provider recommended a resource absent from supplied mappings")
-        # Resource titles, URLs and citations come from workbook rows, never the LLM.
+            raise ValueError("Invalid deterministic resource mapping")
+        # Official recommendations use the same deterministic engine as Skill Intelligence.
+        source_mapping = db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first()
+        if source_mapping:
+            from intelligence_service import validated_courses
+            from schemas import LearningResource
+            official_for_courses = db.query(models.OfficialLevel).filter_by(employee_id=employee_id, role_skill_map_id=mapping.id).first()
+            courses, learning_status = validated_courses(db, employee.employee_id, source_mapping,
+                official_for_courses.confirmed_level if official_for_courses else None, mapping.target_level)
+            resources = [LearningResource(resource_id=c["course_id"], title=c["title"],
+                source_file=c["provenance"][1]["workbook"], source_sheet=c["provenance"][1]["sheet"],
+                source_row=c["provenance"][1]["row"], mapping_sheet=c["provenance"][0]["sheet"],
+                mapping_row=c["provenance"][0]["row"], source_skill_id=source_mapping.details["skill_key"],
+                review_status="Approved") for c in courses]
+            allowed = {r.resource_id:r for r in resources}
+            selected = list(allowed)
+            detail.recommended_resource_ids = selected
+            if not selected:
+                detail.next_steps = ["No validated course recommendation available."]
         recommended = [] if current is None else [allowed[key] for key in selected]
         if current is None and resources:
             learning_status = "Recommendation pending policy validation; exact workbook mappings remain source metadata"
@@ -66,6 +92,8 @@ def get_employee_tni(db: Session, employee_id: int):
     profile = db.get(models.UserProfile, employee_id)
     if profile and profile.job_role_id:
         for mapping in db.query(models.RoleSkillMap).filter_by(role_id=profile.job_role_id, is_expected=True):
+            if config.LLM_PROVIDER == "luna" and not db.query(models.SourceRecord).filter_by(entity_type="mapping", entity_id=mapping.id).first():
+                continue
             if mapping.target_level is not None and mapping.id not in seen:
                 skill = db.get(models.Skill, mapping.skill_id)
                 resources, learning_status = source_learning(db, skill, profile.business_function or "")
@@ -80,7 +108,7 @@ def get_employee_tni(db: Session, employee_id: int):
         employee_id=employee.id, employee_code=employee.employee_id,
         employee_name=employee.full_name, xp_points=employee.xp_points,
         skills_assessed=len(gaps), target_met=target_met,
-        development_needed=sum(item.skill_gap is not None and item.skill_gap > 0 for item in gaps), provider=provider.name, skill_gaps=gaps,
+        development_needed=sum(item.skill_gap is not None and item.skill_gap > 0 for item in gaps), provider=config.LLM_PROVIDER, skill_gaps=gaps,
         unassessed_skills=unassessed,
     )
 

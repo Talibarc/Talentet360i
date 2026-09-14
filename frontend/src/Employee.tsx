@@ -95,7 +95,11 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
                 <div className="level-comparison">
                   <div>
                     <small>Calculated / provisional</small>
-                    <strong>{g.current_level === null ? "Pending policy validation" : `Level ${g.current_level}`}</strong>
+                    <strong>
+                      {g.current_level === null
+                        ? "Pending policy validation"
+                        : `Level ${g.current_level}`}
+                    </strong>
                   </div>
                   <div>
                     <small>Official confirmed</small>
@@ -139,7 +143,9 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
                       <p>
                         Scope: {r.level_scope ?? "Not supplied"} · Approval:{" "}
                         {r.review_status ?? "Not supplied"}
-                        {r.availability_status ? ` · Availability: ${r.availability_status.replaceAll("_", " ")}` : ""}
+                        {r.availability_status
+                          ? ` · Availability: ${r.availability_status.replaceAll("_", " ")}`
+                          : ""}
                       </p>
                     </div>
                   ))
@@ -164,11 +170,26 @@ export function TniView({ api, userId }: { api: Api; userId: number }) {
               <div>
                 <strong>{s.skill_name}</strong>
                 <p>
-                  Target {s.target_label ?? `level ${s.target_level}`} · Current level has not been
-                  calculated.
+                  Target {s.target_label ?? `level ${s.target_level}`} · Current
+                  level has not been calculated.
                 </p>
-                {s.learning_resources?.map((r) => <p key={r.resource_id}>{safeUrl(r.url) ? <a href={safeUrl(r.url)} target="_blank" rel="noreferrer">{r.title}</a> : r.title} <small>{r.source_file}, row {r.source_row}</small></p>)}
-                {s.learning_resources?.length === 0 && <p>Mapping unavailable — pending source validation.</p>}
+                {s.learning_resources?.map((r) => (
+                  <p key={r.resource_id}>
+                    {safeUrl(r.url) ? (
+                      <a href={safeUrl(r.url)} target="_blank" rel="noreferrer">
+                        {r.title}
+                      </a>
+                    ) : (
+                      r.title
+                    )}{" "}
+                    <small>
+                      {r.source_file}, row {r.source_row}
+                    </small>
+                  </p>
+                ))}
+                {s.learning_resources?.length === 0 && (
+                  <p>Mapping unavailable — pending source validation.</p>
+                )}
               </div>
               <Chip>not_assessed</Chip>
             </div>
@@ -325,61 +346,83 @@ export default function Employee({
             {startError && <p role="alert">{startError}</p>}
             <DataState state={assessments}>
               {(rows) =>
-                rows.length ? (
-                  rows.map((a) => (
-                    <div className="record" key={a.id}>
-                      <div className="row">
-                        <div>
-                          <h3>{mappingName(catalog, a.role_skill_map_id)}</h3>
-                          <small>
-                            Assessment {a.id} · {a.total_questions} questions
-                          </small>
-                        </div>
-                        <Chip>{a.status}</Chip>
-                      </div>
-                      {a.status === "submitted" ? (
-                        <>
-                          <div className="level-comparison">
-                            <div>
-                              <small>Score</small>
-                              <strong>{a.score_percentage}%</strong>
-                            </div>
-                            <div>
-                              <small>Calculated / provisional</small>
-                              <strong>{a.achieved_level === null ? "Pending policy validation" : `Level ${a.achieved_level}`}</strong>
-                            </div>
-                            <div>
-                              <small>Engagement</small>
-                              <strong>+{a.xp_awarded} XP</strong>
-                            </div>
+                rows.some((a) =>
+                  page === "results"
+                    ? a.status === "submitted"
+                    : a.status !== "submitted",
+                ) ? (
+                  rows
+                    .filter((a) =>
+                      page === "results"
+                        ? a.status === "submitted"
+                        : a.status !== "submitted",
+                    )
+                    .map((a) => (
+                      <div className="record" key={a.id}>
+                        <div className="row">
+                          <div>
+                            <h3>{mappingName(catalog, a.role_skill_map_id)}</h3>
+                            <small>
+                              Assessment {a.id} · {a.total_questions} questions
+                            </small>
                           </div>
-                          <button onClick={() => setAssessment(a.id)}>
-                            Result and review status
+                          <Chip>{a.status}</Chip>
+                        </div>
+                        {a.status === "submitted" ? (
+                          <>
+                            <div className="level-comparison">
+                              <div>
+                                <small>Score</small>
+                                <strong>{a.score_percentage}%</strong>
+                              </div>
+                              <div>
+                                <small>Calculated / provisional</small>
+                                <strong>
+                                  {a.achieved_level === null
+                                    ? "Pending policy validation"
+                                    : `Level ${a.achieved_level}`}
+                                </strong>
+                              </div>
+                              <div>
+                                <small>Engagement</small>
+                                <strong>+{a.xp_awarded} XP</strong>
+                              </div>
+                            </div>
+                            <button onClick={() => setAssessment(a.id)}>
+                              Result and review status
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="primary"
+                            onClick={async () => {
+                              setStartError("");
+                              try {
+                                await api(`/assessments/${a.id}/start`, "POST");
+                                setAssessment(a.id);
+                                setVersion((v) => v + 1);
+                              } catch (error) {
+                                setStartError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not start assessment. Please retry.",
+                                );
+                              }
+                            }}
+                          >
+                            {a.status === "in_progress"
+                              ? "Resume assessment"
+                              : "Start Assessment"}
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          className="primary"
-                          onClick={async () => {
-                            setStartError("");
-                            try {
-                              await api(`/assessments/${a.id}/start`, "POST");
-                              setAssessment(a.id);
-                              setVersion((v) => v + 1);
-                            } catch (error) {
-                              setStartError(error instanceof Error ? error.message : "Could not start assessment. Please retry.");
-                            }
-                          }}
-                        >
-                          {a.status === "in_progress" ? "Resume assessment" : "Start Assessment"}
-                        </button>
-                      )}
-                    </div>
-                  ))
+                        )}
+                      </div>
+                    ))
                 ) : (
                   <Empty>
                     No assessment assigned yet. Your manager or L&D can assign
-                    approved questions. {user.business_function === "DataOps" && "The Faiza question source is Unavailable — excluded from MVP. Imported records: 0."}
+                    approved questions.{" "}
+                    {user.business_function === "DataOps" &&
+                      "The Faiza question source is Unavailable — excluded from MVP. Imported records: 0."}
                   </Empty>
                 )
               }
@@ -485,10 +528,23 @@ function AssessmentScreen({
               />
               <Stat
                 label="Provisional level"
-                value={d.assessment.achieved_level ?? "Pending policy validation"}
+                value={
+                  d.assessment.achieved_level ?? "Pending policy validation"
+                }
                 note="Official level requires manager confirmation"
               />
             </div>
+            {d.skill_results?.length ? (
+              <Panel title="Assessed skills">
+                {d.skill_results.map((r) => (
+                  <p key={r.role_skill_map_id}>
+                    {r.source_skill_id ? `${r.source_skill_id} — ` : ""}{r.skill_name}: {r.score_percentage}% ·{" "}
+                    {r.total_questions} questions ·{" "}
+                    {r.achieved_level ?? "Pending policy validation."}
+                  </p>
+                ))}
+              </Panel>
+            ) : null}
             <Chip>{d.review_status}</Chip>
             <HistoryView api={api} path={`/assessments/${id}/history`} />
             {d.review_status === "sent_back" && (

@@ -993,3 +993,131 @@ footer {
     visibility: visible;
   }
 }
+
+/* Focused role workspaces, sized for office laptops and keyboard users. */
+.sidebar {
+  width: 248px;
+  padding: 22px 14px;
+  overflow-y: auto;
+}
+.sidebar nav {
+  gap: 3px;
+}
+.sidebar nav button {
+  padding: 9px 10px;
+  min-height: 38px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.nav-caption {
+  margin: 26px 10px 12px;
+}
+.sidebar-footer {
+  padding-top: 22px;
+}
+.main-shell {
+  margin-left: 248px;
+  width: calc(100% - 248px);
+}
+.topbar {
+  min-height: 66px;
+  padding: 10px 26px;
+}
+.page-heading h1 {
+  font-size: 26px;
+  letter-spacing: -0.5px;
+}
+.page-heading {
+  margin-bottom: 22px;
+}
+.page-content {
+  display: grid;
+  gap: 20px;
+}
+.card {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px #14213a05;
+}
+.intelligence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.skill-card {
+  border: 1px solid #dbe3ed;
+  padding: 18px;
+  border-radius: 7px;
+  min-width: 0;
+}
+.skill-card h3 {
+  font-size: 15px;
+}
+.skill-card .row {
+  align-items: flex-start;
+}
+.skill-card .chip {
+  white-space: normal;
+}
+.selected-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.selected-skills .chip {
+  white-space: normal;
+  text-align: left;
+}
+.skill-picker {
+  min-width: min(320px, 65vw);
+  max-width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.skill-options {
+  max-height: 190px;
+  overflow-y: auto;
+}
+.skill-option {
+  align-items: flex-start;
+  padding: 7px 2px;
+}
+.table-scroll {
+  max-width: 100%;
+}
+.skill-card small,
+td small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.stats {
+  margin: 0;
+}
+@media (max-width: 1050px) {
+  .intelligence-grid {
+    grid-template-columns: 1fr;
+  }
+  .header-actions {
+    gap: 8px;
+  }
+}
+@media (max-width: 760px) {
+  .main-shell {
+    margin-left: 0;
+    width: 100%;
+  }
+  .topbar {
+    padding: 10px 14px;
+  }
+  .sidebar {
+    width: 248px;
+  }
+  .page-heading h1 {
+    font-size: 23px;
+  }
+  .skill-card {
+    padding: 14px;
+  }
+}
+
+.stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }

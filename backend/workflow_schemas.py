@@ -73,3 +73,11 @@ class ProfileUpdate(BaseModel):
     business_function: str | None = Field(default=None, max_length=100)
     team: str | None = Field(default=None, max_length=100)
     hub: str | None = Field(default=None, max_length=100)
+
+
+class SourceRemap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    skill_ids: list[str] = Field(min_length=1, max_length=100)
+    expected_skill_ids: list[str]
+    comment: str = Field(min_length=3, max_length=1000)
+    confirmed: Literal[True]

@@ -2,6 +2,7 @@ from collections import defaultdict
 from fastapi import HTTPException
 from sqlalchemy import select
 import models
+from assessment_service import assessment_visible
 from auth import require, profile
 
 
@@ -38,6 +39,8 @@ def aggregate(db, actor, group_by, filters):
     groups = defaultdict(lambda: {"count": 0, "gap_count": 0, "total_gap": 0})
     total = 0
     for official, mapping, role, skill, member in db.execute(query):
+        if not assessment_visible(db, db.get(models.Assessment, official.assessment_id)):
+            continue
         values = {"role": (role.id, role.role_name), "skill": (skill.id, skill.name), "team": member.team,
                   "function": member.business_function, "hub": member.hub, "level": official.confirmed_level}
         key = tuple(values[d] for d in dimensions)

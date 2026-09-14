@@ -8,14 +8,16 @@ export default function Reviewer({
   api,
   refresh,
   businessFunction,
+  initialStatus = "pending_review",
 }: {
   api: Api;
   refresh: () => void;
   businessFunction?: string | null;
+  initialStatus?: string;
 }) {
   const [version, setVersion] = useState(0),
     [selected, setSelected] = useState<number | null>(null),
-    [status, setStatus] = useState("pending_review");
+    [status, setStatus] = useState(initialStatus);
   const state = useResource<Question[]>(api, "/questions", version);
   const update = () => {
     setVersion((v) => v + 1);
@@ -148,6 +150,11 @@ function QuestionWorkspace({
       <button onClick={() => setEditing(!editing)}>
         {editing ? "Cancel editing" : "Edit a new revision"}
       </button>
+      <details>
+        <summary>Request a new draft</summary>
+        <p>The current question and its review history will be preserved. The new draft needs a separate SME review.</p>
+        <ActionForm label="Regenerate draft" onSubmit={() => api(`/questions/${q.id}/regenerate`, "POST")} success={refresh}><span /></ActionForm>
+      </details>
       <DataState state={history}>
         {(rows) => (
           <>

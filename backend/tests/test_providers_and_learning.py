@@ -40,7 +40,8 @@ def test_luna_calls_preserved_adapter(monkeypatch):
     detail = TniNarrative(summary="Synthetic", development_focus="Review", next_steps=["Review"],
                           recommended_resource_ids=[], limitations=["Synthetic fixture"])
     monkeypatch.setattr(llm_service, "generate_text", lambda *args: detail.model_dump_json())
-    assert get_provider().tni({"skill_gap": 1}, []) == detail
+    monkeypatch.setattr(llm_service, "generate_text", lambda *args: pytest.fail("TNI must be local"))
+    assert get_provider().tni({"skill_name":"Synthetic", "current_level":1, "target_level":2, "skill_gap":1}, []).recommended_resource_ids == []
 
 
 @pytest.mark.parametrize("response", ["not json", "[]", '[{"question_text":"Incomplete"}]'])
@@ -57,8 +58,8 @@ def test_luna_missing_credentials_safe_http_error(client, seeded, monkeypatch):
     monkeypatch.setattr(config, "CIS_BASE_URL", "")
     monkeypatch.setattr("question_service.build_finance_rag_context", lambda *args: "Synthetic source")
     response = client.post("/questions/generate", json={"role_skill_map_id": seeded["mapping"]["id"]})
-    assert response.status_code == 503
-    assert "Configure" in response.json()["detail"]
+    assert response.status_code == 409
+    assert "validated source mapping" in response.json()["detail"]
 
 
 def test_dotenv_only_provider_switch(tmp_path):
@@ -165,7 +166,7 @@ def test_broken_or_ambiguous_course_mapping(monkeypatch):
     assert learning_service.get_learning_resources("Synthetic", "Finance")[0] == []
 
 
-def test_unsupported_tni_resource_rejected(client, seeded, monkeypatch):
+def test_provider_cannot_invent_tni_resource(client, seeded, monkeypatch):
     from test_workflows import generate, approve, assign, submit
     questions = generate(client, seeded, 1)
     approve(client, questions)
@@ -175,4 +176,5 @@ def test_unsupported_tni_resource_rejected(client, seeded, monkeypatch):
                             recommended_resource_ids=["invented"], limitations=[])
     monkeypatch.setattr(MockProvider, "tni", invented)
     response = client.get(f"/users/{seeded['user']['id']}/tni")
-    assert response.status_code == 503
+    assert response.status_code == 200
+    assert response.json()["skill_gaps"][0]["detail"]["recommended_resource_ids"] == []

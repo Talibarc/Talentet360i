@@ -1,3 +1,11 @@
+# Final role UX and Skill Intelligence pass
+
+Verified 14 September 2026: **150 backend tests and 40 frontend tests passed**; frontend lint/build and Git whitespace/security checks passed. Mock-only role and populated-flow checks passed. Office integration and the explicit official source/policy decisions in the report remain outstanding.
+
+See [FINAL_IMPLEMENTATION_REPORT.md](FINAL_IMPLEMENTATION_REPORT.md) for the current MVP traceability, exact office commands, source-policy limitations, cleanup and acceptance checklist. Historical phase notes below are retained for audit context.
+
+Finance and DataOps/RD now have separate source/generation pages in one role-based shell. TNI and Skill Intelligence are deterministic local services; workbook import works independently of the question-generation provider. L&D can review and audit source skill remapping without replacing document content or chunk versions. Source assessments enforce the 20-question 6/8/6 blueprint, skill coverage and reassessment reuse limits; unsupported allocation/scoring remains explicitly pending.
+
 # Talent360i skills and development workspace
 
 Phase 5A adds a provider-independent offline RAG foundation for RD/DataOps. `backend/offline_rag.py` ingests only manifest-approved PDF, DOCX, PPTX or text files beneath `RAG_SOURCE_DIR`, writes a Git-ignored deterministic index, and retrieves by exact function, Skill_ID, proficiency, approval and synthetic policy. Workbook URLs remain metadata and are never fetched. Finance keeps its validated workbook behavior.

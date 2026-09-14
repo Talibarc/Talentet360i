@@ -20,6 +20,7 @@ export interface Role {
   business_function: string;
 }
 export interface Skill {
+  source_key?: string;
   id: number;
   name: string;
   category?: string | null;
@@ -63,6 +64,14 @@ export interface Assessment {
   xp_awarded: number;
 }
 export interface AssessmentDetail {
+  skill_results?: {
+    skill_name: string;
+    source_skill_id: string | null;
+    role_skill_map_id: number;
+    score_percentage: number;
+    achieved_level: number | null;
+    total_questions: number;
+  }[];
   assessment: Assessment;
   questions: {
     question_id: number;
@@ -137,7 +146,13 @@ export interface Tni {
   target_met: number;
   development_needed: number;
   skill_gaps: Gap[];
-  unassessed_skills: { skill_name: string; target_level: number; target_label?: string; learning_resources?: Resource[]; learning_status?: string }[];
+  unassessed_skills: {
+    skill_name: string;
+    target_level: number;
+    target_label?: string;
+    learning_resources?: Resource[];
+    learning_status?: string;
+  }[];
 }
 export interface Notice {
   id: number;

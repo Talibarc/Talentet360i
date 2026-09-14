@@ -50,7 +50,7 @@ def test_authoritative_inventory_and_frameworks(originals):
     assert len(report["inventory"][source.RD_FILE.name]["sheets"]) == 11
     for path in (source.FINANCE_FILE, source.RD_FILE):
         assert report["inventory"][path.name]["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
-    assert report["counts"][source.FINANCE_FILE.name] == dict(skill=28, role=9, role_description=12, mapping=60, question=49, learning=30)
+    assert report["counts"][source.FINANCE_FILE.name] == dict(skill=28, role=9, role_description=12, mapping=60, question=49, learning=30, course=31, tni=360)
     assert report["counts"][source.RD_FILE.name] == dict(skill=38, role=3, mapping=114, learning=38, source_metadata=7, question_source=1)
     rd = [r["details"] for r in rows if r["workbook"] == source.RD_FILE.name and r["entity_type"] == "mapping"]
     assert Counter(r["role_key"] for r in rd if r["is_expected"]) == {"B2": 17, "B3": 31, "B4": 38}
@@ -83,7 +83,7 @@ def test_import_idempotent_and_preserves_sources(planned):
         first = source.import_sources(db)
         ids = [(r.id, r.entity_id) for r in db.query(models.SourceRecord)]
         revisions = db.query(models.QuestionRevision).count()
-        assert first["changed"] == 389
+        assert first["changed"] == 780
         assert source.import_sources(db)["changed"] == 0
         assert [(r.id, r.entity_id) for r in db.query(models.SourceRecord)] == ids
         assert db.query(models.QuestionRevision).count() == revisions
@@ -171,7 +171,7 @@ def test_workbook_journey_pending_policy_and_activity_xp(planned, secure_client)
          {"employee_id": emp, "role_skill_map_id": mapping, "question_count": 20}, expected=409)
     detail = call("GET", f"/assessments/{assessment}", emp)
     call("POST", "/questions/generate", actor("reviewer", "Finance"),
-         {"role_skill_map_id": detail["assessment"]["role_skill_map_id"], "question_count": 1}, expected=409)
+         {"role_skill_map_id": detail["assessment"]["role_skill_map_id"], "question_count": 1}, expected=201)
     assert all("correct_answer" not in q for q in detail["questions"])
     assert not any("Synthetic Finance Practice" in q["question_text"] for q in detail["questions"])
     assert call("POST", f"/assessments/{assessment}/start", emp)["status"] == "in_progress"

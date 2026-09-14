@@ -83,10 +83,9 @@ export default function Governance({ api }: { api: Api }) {
       <div className="warning">
         <strong>Data-source limitations</strong>
         <p>
-          13 Finance skill references remain unresolved. Approved SOP documents
-          are absent. Mock exercises are synthetic; company scoring policies and
-          workbook confidentiality still need validation. Missing learning
-          mappings produce no course recommendations.
+          13 Finance skill references and incomplete scoring policy remain
+          pending. Source Governance shows current document availability. Only
+          validated training mappings may support course recommendations.
         </p>
       </div>
       <Panel title="Audit history">

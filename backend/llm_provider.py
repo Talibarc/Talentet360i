@@ -125,18 +125,9 @@ class LunaProvider:
             raise ProviderError("Luna returned invalid question data") from None
 
     def tni(self, facts: dict, resources: list[dict]) -> TniNarrative:
-        raw = self._generate(
-            "Return a JSON TNI narrative using only supplied facts and learning resources. "
-            "Do not calculate or change proficiency. Do not invent courses, URLs, or policies. "
-            "Use only supplied resource IDs, with an empty list if none exist. "
-            "Return summary, development_focus, next_steps (string array), "
-            "recommended_resource_ids (string array), limitations (string array).",
-            json.dumps({"facts": facts, "available_resources": resources}),
-        )
-        try:
-            return TniNarrative.model_validate_json(raw)
-        except ValueError:
-            raise ProviderError("Luna returned invalid TNI data") from None
+        # Backward-compatible local helper; Luna is never invoked for TNI.
+        from deterministic_tni import narrative
+        return narrative(facts, resources)
 
 
 def get_provider() -> LlmProvider:
