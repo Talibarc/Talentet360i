@@ -1,19 +1,24 @@
 import { useState } from "react";
 import type { Api } from "./api";
+import type { Catalog } from "./Admin";
 import type { Question, Revision } from "./types";
 import { useResource } from "./hooks";
 import { date } from "./format";
-import { ActionForm, Chip, DataState, Empty, Field, Panel } from "./ui";
+import { ActionForm, Chip, DataState, Empty, Field, Panel, Modal } from "./ui";
 export default function Reviewer({
   api,
   refresh,
   businessFunction,
   initialStatus = "pending_review",
+  catalog,
+  canManage = false,
 }: {
   api: Api;
   refresh: () => void;
   businessFunction?: string | null;
   initialStatus?: string;
+  catalog?: Catalog;
+  canManage?: boolean;
 }) {
   const [version, setVersion] = useState(0),
     [selected, setSelected] = useState<number | null>(null),
@@ -26,7 +31,7 @@ export default function Reviewer({
   return (
     <>
       <div className="tabs" aria-label="Question status">
-        {["pending_review", "approved", "rejected", "all"].map((s) => (
+        {["pending_review", "approved", "rejected"].map((s) => (
           <button
             className={status === s ? "active" : ""}
             key={s}
@@ -35,7 +40,7 @@ export default function Reviewer({
               setSelected(null);
             }}
           >
-            {s.replaceAll("_", " ")}
+            {{pending_review:"Pending Review", approved:"Approved", rejected:"Rejected"}[s]}
           </button>
         ))}
       </div>
@@ -53,7 +58,7 @@ export default function Reviewer({
                       onClick={() => setSelected(q.id)}
                     >
                       <span className="eyebrow">
-                        Question {q.id} · Level {q.skill_level}
+                        {catalog?.skills.find(s=>s.id===q.skill_id)?.name ?? "Question"} · {q.difficulty ?? `Level ${q.skill_level}`}
                       </span>
                       <strong>{q.question_text}</strong>
                       <Chip>{q.status}</Chip>
@@ -64,9 +69,7 @@ export default function Reviewer({
                 (q) => status === "all" || q.status === status,
               ) && (
                 <Empty>
-                  {businessFunction === "DataOps"
-                    ? "No approved DataOps question rows are available. Faiza source status: Unavailable — excluded from MVP. Imported records: 0."
-                    : "No questions in this queue. Generate drafts from the Admin workspace."}
+                  No {businessFunction ?? ""} questions in this queue. Questions appear here after generation or review.
                 </Empty>
               )}
             </Panel>
@@ -76,6 +79,8 @@ export default function Reviewer({
                 api={api}
                 q={questions.find((q) => q.id === selected)!}
                 refresh={update}
+                canManage={canManage}
+                skillName={catalog?.skills.find(s=>s.id===questions.find(q=>q.id===selected)?.skill_id)?.name ?? "Question review"}
               />
             ) : (
               <Panel title="Review workspace">
@@ -95,15 +100,20 @@ function QuestionWorkspace({
   api,
   q,
   refresh,
+  canManage,
+  skillName,
 }: {
   api: Api;
   q: Question;
+  canManage: boolean;
+  skillName: string;
   refresh: () => void;
 }) {
   const history = useResource<Revision[]>(api, `/questions/${q.id}/history`),
-    [editing, setEditing] = useState(false);
+    [editing, setEditing] = useState(false),
+    [manage, setManage] = useState<"delete" | "reset" | null>(null);
   return (
-    <Panel title={`Question ${q.id}`} action={<Chip>{q.status}</Chip>}>
+    <Panel title={skillName} action={<Chip>{q.status}</Chip>}>
       <h3>{q.question_text}</h3>
       <div className="answers">
         {Object.entries(q.options).map(([key, value]) => (
@@ -121,10 +131,12 @@ function QuestionWorkspace({
         <strong>Answer rationale</strong>
         <p>{q.explanation}</p>
       </div>
-      <div className="source-note">
-        <strong>RAG / source provenance</strong>
+      <details className="source-note">
+        <summary>Source and audit details</summary>
+        <p>Question reference: {q.id}</p>
         <p>{q.rag_source ?? "No source reference available"}</p>
-      </div>
+        <p>{q.document_references?.join("; ")}</p><p>{q.chunk_references?.join("; ")}</p>
+      </details>
       {q.status === "pending_review" && (
         <ActionForm
           label="Record review"
@@ -147,6 +159,17 @@ function QuestionWorkspace({
           </Field>
         </ActionForm>
       )}
+      {canManage && <div className="actions">
+        {q.status !== "pending_review" && <button onClick={()=>setManage("reset")}>Send for Review</button>}
+        <button className="danger" onClick={()=>setManage("delete")}>Delete Question</button>
+      </div>}
+      {manage && <Modal title={manage === "delete" ? "Delete Question" : "Send for Review"} close={()=>setManage(null)}>
+        <p>{manage === "delete" ? "Remove this question from the Question Bank? It will be archived so existing assessment and review history is preserved." : "Send this question back for SME review? It will not be eligible for new assessments until approved again."}</p>
+        <DataState state={history}>{rows=><ActionForm label={manage === "delete" ? "Delete" : "Send for Review"} success={refresh} onSubmit={d=>api(`/questions/${q.id}${manage === "reset" ? "/send-for-review" : ""}`,manage === "delete" ? "DELETE" : "POST",{expected_revision:rows.at(-1)?.revision,confirmed:true,comment:d.get("comment")})}>
+          <Field label="Reason"><textarea name="comment" required minLength={3} maxLength={1000}/></Field>
+          <button type="button" onClick={()=>setManage(null)}>Cancel</button>
+        </ActionForm>}</DataState>
+      </Modal>}
       <button onClick={() => setEditing(!editing)}>
         {editing ? "Cancel editing" : "Edit a new revision"}
       </button>

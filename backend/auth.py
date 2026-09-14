@@ -40,7 +40,12 @@ def employee_access(db, actor, employee_id, *, write=False):
     employee = db.get(models.User, employee_id)
     if employee is None:
         raise HTTPException(404, "Employee not found")
-    if actor.role in ADMIN_ROLES or actor.id == employee_id:
+    if actor.role in ADMIN_ROLES:
+        from function_scope import check_function
+        details = profile(db, employee_id)
+        check_function(db, actor, details.business_function if details else None)
+        return employee
+    if actor.id == employee_id:
         return employee
     details = profile(db, employee_id)
     if not write and actor.role == "manager" and details and details.manager_id == actor.id:
@@ -63,6 +68,8 @@ def mapping_access(db, actor, mapping_id):
     if mapping is None:
         raise HTTPException(404, "Role-skill mapping not found")
     if actor.role in ADMIN_ROLES:
+        from function_scope import check_function
+        check_function(db, actor, db.get(models.Role, mapping.role_id).business_function)
         return mapping
     role = db.get(models.Role, mapping.role_id)
     details = profile(db, actor.id)

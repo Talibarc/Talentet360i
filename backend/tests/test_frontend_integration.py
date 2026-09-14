@@ -14,7 +14,14 @@ def test_demo_selector_only_explicit_synthetic_seed(secure_client):
     response = secure_client.get('/demo/identities')
     assert response.status_code == 200
     rows = response.json()['identities']
-    assert {r['id'] for r in rows} == {r['id'] for r in seeded['identities']}
+    # The normal selector intentionally hides the internal global Admin/L&D
+    # identities and adds a scoped L&D identity for each function.
+    assert len(rows) == 10
+    assert {(r['role'], r['business_function']) for r in rows} == {
+        (role, function)
+        for function in ('Finance', 'DataOps')
+        for role in ('ld', 'reviewer', 'manager', 'employee', 'leader')
+    }
     assert len(rows) == 10
     assert all(set(r) == {'id', 'role', 'label', 'business_function'} for r in rows)
     assert all(r['label'] != 'DEMO-IMPOSTOR' for r in rows)
@@ -36,7 +43,8 @@ def test_luna_with_explicit_demo_access_keeps_roles_and_provider(secure_client, 
     assert response.json()['provider'] == 'luna'
     assert isinstance(get_provider(), LunaProvider)
     identities = response.json()['identities']
-    assert {'admin', 'ld', 'reviewer', 'manager', 'employee', 'leader'} <= {row['role'] for row in identities}
+    assert {row['role'] for row in identities} == {'ld', 'reviewer', 'manager', 'employee', 'leader'}
+    assert {row['business_function'] for row in identities} == {'Finance', 'DataOps'}
     employee = next(row for row in identities if row['role'] == 'employee')
     assert secure_client.get('/data/inventory', headers={'X-Demo-User-Id': str(employee['id'])}).status_code == 403
 

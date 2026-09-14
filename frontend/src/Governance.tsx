@@ -70,7 +70,7 @@ export function Notifications({
     </Panel>
   );
 }
-export default function Governance({ api }: { api: Api }) {
+export default function Governance({ api, businessFunction }: { api: Api; businessFunction?: string | null }) {
   const [action, setAction] = useState(""),
     [query, setQuery] = useState(""),
     [after, setAfter] = useState(0),
@@ -80,14 +80,9 @@ export default function Governance({ api }: { api: Api }) {
     );
   return (
     <>
-      <div className="warning">
-        <strong>Data-source limitations</strong>
-        <p>
-          13 Finance skill references and incomplete scoring policy remain
-          pending. Source Governance shows current document availability. Only
-          validated training mappings may support course recommendations.
-        </p>
-      </div>
+      <details className="source-note"><summary>Data limitations</summary>
+        <p>{businessFunction === "DataOps" ? "Evidence and proficiency policies require validation. Check Sources for document availability." : "13 Finance skill references and incomplete scoring policy remain pending."} Only validated mappings support training recommendations.</p>
+      </details>
       <Panel title="Audit history">
         <form
           className="actions"

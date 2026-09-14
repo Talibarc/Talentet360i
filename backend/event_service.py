@@ -3,6 +3,11 @@ from sqlalchemy import update
 
 
 def audit(db, actor_id, action, entity_type, entity_id, *, subject_id=None, details=None):
+    from function_scope import event_function
+    details = dict(details or {})
+    function = event_function(db, entity_type, entity_id, subject_id, details)
+    if function:
+        details["business_function"] = function
     row = models.AuditEvent(actor_id=actor_id, subject_id=subject_id, action=action,
                             entity_type=entity_type, entity_id=entity_id, details=details or {})
     db.add(row)

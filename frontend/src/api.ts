@@ -48,7 +48,7 @@ export function createApi(userId: number | null) {
     }
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      const detail =
+      let detail =
         typeof data?.detail === "string"
           ? data.detail
           : Array.isArray(data?.detail)
@@ -59,6 +59,9 @@ export function createApi(userId: number | null) {
                 )
                 .join("; ")
             : "";
+      if (response.status === 502) detail = "The generated questions could not be validated. Please contact L&D before trying again.";
+      else if (response.status === 503) detail = "Unable to complete the request. Please check your laptop configuration and try again.";
+      else if (/luna|rag|provider|endpoint|traceback/i.test(detail)) detail = "Unable to complete this action. Please contact L&D for help.";
       throw new ApiError(
         response.status,
         [

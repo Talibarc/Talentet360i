@@ -538,7 +538,7 @@ function AssessmentScreen({
               <Panel title="Assessed skills">
                 {d.skill_results.map((r) => (
                   <p key={r.role_skill_map_id}>
-                    {r.source_skill_id ? `${r.source_skill_id} — ` : ""}{r.skill_name}: {r.score_percentage}% ·{" "}
+                    {r.skill_name}: {r.score_percentage}% ·{" "}
                     {r.total_questions} questions ·{" "}
                     {r.achieved_level ?? "Pending policy validation."}
                   </p>

@@ -35,7 +35,7 @@ describe("central API client", () => {
     expect(options?.body).toBe(form);
     expect(options?.headers).toEqual({ "x-demo-user-id": "418" });
   });
-  it.each([401, 403, 404, 409, 422, 502, 503])(
+  it.each([401, 403, 404, 409, 422])(
     "handles status %s with actionable detail",
     async (status) => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -47,6 +47,15 @@ describe("central API client", () => {
       });
     },
   );
+  it.each([502, 503])("uses provider-neutral copy for status %s", async (status) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response('{"detail":"Luna endpoint failed"}', { status }),
+    );
+    await expect(createApi(91)("/test")).rejects.toMatchObject({
+      status,
+      message: expect.not.stringMatching(/luna|endpoint/i),
+    });
+  });
   it("shows a provider-independent disabled-demo message", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response('{"detail":"Demo identities are disabled in this environment."}', { status: 403 }),

@@ -75,8 +75,7 @@ describe("role workflows", () => {
     expect(
       await screen.findByRole("button", { name: "Associate Finance" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
-    expect(screen.getByText(/Generation provider: luna/)).toBeInTheDocument();
+    expect(screen.queryByText(/Generation provider|luna/i)).not.toBeInTheDocument();
   });
   it("discovers identities dynamically and hides admin navigation for employees", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
@@ -117,6 +116,33 @@ describe("role workflows", () => {
     expect(
       await screen.findByText(/No assessment assigned yet/),
     ).toBeInTheDocument();
+  });
+  it("shows a DataOps L&D workspace with its own sources-first navigation", async () => {
+    const ld = { ...user, id: 702, role: "ld", business_function: "DataOps" };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      const data: Record<string, unknown> = {
+        "/api/demo/identities": {
+          provider: "mock",
+          identities: [{ id: 702, role: "ld", label: "Synthetic", business_function: "DataOps" }],
+        },
+        "/api/me": ld,
+        "/api/roles": [], "/api/skills": [], "/api/role-skill-maps": [], "/api/users": [],
+        "/api/notifications/unread-count": { unread_count: 0 },
+        "/api/sources/status": { local_rag_sources: [] },
+        "/api/rag/source-registry": { sources: [], skills: [], limits: {
+          maximum_files: 20, maximum_file_bytes: 1000, maximum_batch_bytes: 5000,
+        } },
+      };
+      return new Response(JSON.stringify(data[path]));
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "L&D DataOps" }));
+    expect(await screen.findByRole("heading", { name: "Sources", level: 1 })).toBeInTheDocument();
+    for (const label of ["Sources", "Create Questions", "Question Bank", "Assessments", "Training Mappings", "Notifications", "Audit History"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByText(/All functions|L&D Overview|Generation provider/i)).not.toBeInTheDocument();
   });
   it("submits only employee-selected answers, never renders answer keys", async () => {
     const api = mockApi({
@@ -232,8 +258,9 @@ describe("role workflows", () => {
       "/questions/301/review": q,
     });
     render(<Reviewer api={api} refresh={vi.fn()} />);
+    expect(screen.queryByText(/Question 301/)).not.toBeInTheDocument();
     await userEvent.click(
-      await screen.findByRole("button", { name: /Question 301/ }),
+      await screen.findByRole("button", { name: /Synthetic question/ }),
     );
     await screen.findByText("Synthetic rationale");
     await userEvent.type(
@@ -390,23 +417,21 @@ describe("role workflows", () => {
     render(
       <Admin api={api} catalog={catalog} refresh={vi.fn()} page="finance" />,
     );
-    await userEvent.selectOptions(
-      screen.getByLabelText("Role and skill"),
-      "601",
-    );
+    await userEvent.selectOptions(screen.getByLabelText("Role"), "801");
+    await userEvent.selectOptions(screen.getByLabelText("Skill"), "601");
     await userEvent.click(
-      screen.getByRole("button", { name: "Generate drafts" }),
+      screen.getByRole("button", { name: "Generate Questions" }),
     );
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/questions/generate", "POST", {
         role_skill_map_id: 601,
         question_count: 3,
         require_approved_sop: false,
-        difficulty: "Easy",
+        difficulty: "Moderate",
       }),
     );
     expect(
-      screen.getByText(/Mock exercises are synthetic/),
+      screen.getByText(/Demo only: practice questions/),
     ).toBeInTheDocument();
   });
   it("action errors remain visible and allow retry", async () => {

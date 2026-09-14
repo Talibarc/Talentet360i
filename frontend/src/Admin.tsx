@@ -1,5 +1,5 @@
 import SkillPicker from "./SkillPicker";
-import { mappingName } from "./catalog";
+
 import { useRef, useState } from "react";
 import type { Api } from "./api";
 import type { Mapping, Role, Skill, User } from "./types";
@@ -183,7 +183,7 @@ export function RagBatchUpload({ api }: { api: Api }) {
     }
   };
   return (
-    <Panel title="Bulk document ingestion">
+    <Panel title="Upload documents">
       <p className="muted">
         Select or drop PDF, DOCX, PPTX and TXT files. Review every source and
         skill mapping before ingestion.
@@ -268,13 +268,13 @@ export function RagBatchUpload({ api }: { api: Api }) {
                                   });
                                 }}
                               >
-                                <option value="">Select Source_ID</option>
+                                <option value="">Select source</option>
                                 {data.sources.map((item) => (
                                   <option
                                     key={item.source_id}
                                     value={item.source_id}
                                   >
-                                    {item.source_id}
+                                    {item.source_title ?? "Source name unavailable"}
                                   </option>
                                 ))}
                               </select>
@@ -414,7 +414,7 @@ export function MappingSelect({
         {catalog.mappings
           .filter(
             (m) =>
-              mappingName(catalog, m.id)
+              (catalog.skills.find(s=>s.id===m.skill_id)?.name ?? "Skill unavailable")
                 .toLowerCase()
                 .includes(search.toLowerCase()) &&
               m.is_expected &&
@@ -425,13 +425,23 @@ export function MappingSelect({
           )
           .map((m) => (
             <option value={m.id} key={m.id}>
-              {mappingName(catalog, m.id)} ·{" "}
+              {(catalog.skills.find(s=>s.id===m.skill_id)?.name ?? "Skill unavailable")} ·{" "}
               {m.target_label ?? `Level ${m.target_level}`}
             </option>
           ))}
       </select>
     </div>
   );
+}
+export function RoleSkillFields({catalog}: {catalog: Catalog}) {
+  const [role, setRole] = useState("");
+  const [mapping, setMapping] = useState("");
+  const selected = catalog.mappings.find(m=>String(m.id)===mapping);
+  return <div className="form-grid">
+    <Field label="Role"><select required value={role} onChange={e=>{setRole(e.target.value);setMapping("");}}><option value="" disabled>Select role</option>{catalog.roles.map(r=><option key={r.id} value={r.id}>{r.role_name}</option>)}</select></Field>
+    <Field label="Skill"><select required name="mapping" value={mapping} disabled={!role} onChange={e=>setMapping(e.target.value)}><option value="" disabled>Select skill</option>{catalog.mappings.filter(m=>String(m.role_id)===role&&m.is_expected&&m.target_level!==null).map(m=><option key={m.id} value={m.id}>{catalog.skills.find(s=>s.id===m.skill_id)?.name ?? "Skill unavailable"}</option>)}</select></Field>
+    {selected && <p className="muted">Expected level: {selected.target_label ?? `Level ${selected.target_level}`}</p>}
+  </div>;
 }
 export function Assignment({
   api,
@@ -450,7 +460,7 @@ export function Assignment({
         eligible.
       </p>
       <ActionForm
-        label="Assign assessment"
+        label="Assign Assessment"
         success={refresh}
         onSubmit={(d) =>
           api("/assessments", "POST", {
@@ -480,7 +490,7 @@ export function Assignment({
                 ))}
             </select>
           </Field>
-          <Field label="Mapped skill">
+          <Field label="Skill">
             <MappingSelect
               key={employee}
               catalog={catalog}

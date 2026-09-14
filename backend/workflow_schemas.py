@@ -81,3 +81,10 @@ class SourceRemap(BaseModel):
     expected_skill_ids: list[str]
     comment: str = Field(min_length=3, max_length=1000)
     confirmed: Literal[True]
+
+
+class QuestionManage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    confirmed: Literal[True]
+    comment: str = Field(min_length=3, max_length=1000)

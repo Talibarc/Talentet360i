@@ -285,8 +285,12 @@ def source_plan():
     return records, report
 
 
-def import_sources(db, actor_id=None):
+def import_sources(db, actor_id=None, workbook=None):
     records, report = source_plan()
+    if workbook:
+        from function_scope import scoped_report
+        records = [r for r in records if r["workbook"] == workbook]
+        report = scoped_report(report, workbook)
     entities = {}
     changed = 0
     for data in records:
@@ -338,6 +342,8 @@ def import_sources(db, actor_id=None):
     # Source disappearance is never silently deleted or reused for new assignments.
     active = {(r['workbook'], r['sheet'], r['source_key']) for r in records}
     for old in db.query(models.SourceRecord):
+        if workbook and old.workbook != workbook:
+            continue
         if (old.workbook, old.sheet, old.source_key) not in active:
             report["issues"].append({"workbook": old.workbook, "sheet": old.sheet, "key": old.source_key,
                                      "reason": "Previously imported row now unavailable; requires reconciliation"})
@@ -345,7 +351,7 @@ def import_sources(db, actor_id=None):
             if old.entity_type == "question": db.get(models.Question, old.entity_id).status = "pending_review"
             old.fingerprint = ""
     if changed:
-        audit(db, actor_id, "sources.imported", "source", None, details={"changed": changed, "counts": report["counts"]})
+        audit(db, actor_id, "sources.imported", "source", None, details={"changed": changed, "counts": report["counts"], "workbook": workbook})
     report["changed"] = changed
     return report
 
